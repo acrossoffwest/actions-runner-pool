@@ -181,6 +181,10 @@
 
     .row-actions { display: flex; gap: 0.4rem; }
     .row-actions button { margin: 0; padding: 0.25rem 0.65rem; font-size: 0.8rem; min-width: 4.5rem; }
+    /* When the cell has no actionable button (e.g. an in_progress row),
+       the placeholder dash should sit centered rather than left-aligned
+       against the column edge. */
+    .row-actions.empty { justify-content: center; }
 
     /* Auth + alert articles render compactly. */
     .auth-panel form {
@@ -196,6 +200,38 @@
       background: #ffebe9;
       color: #cf222e;
     }
+
+    /* Read-only banner shown when ALLOW_ADMIN_EDIT is false. */
+    .readonly-banner {
+      border-color: #d4c79a;
+      background: #fbf7e2;
+      color: #6b4d00;
+      font-size: 0.85rem;
+    }
+    .readonly-banner code {
+      background: rgba(0,0,0,0.06);
+      padding: 0 0.3rem;
+      border-radius: 0.2rem;
+    }
+
+    /* Admin panel (opened by the "Admin" button in the header).
+       Holds the read-only banner and the rotate-credentials forms.
+       Hidden by default to keep the main read view uncluttered. */
+    .admin-panel .admin-section-title { margin: 0 0 0.5rem; font-size: 1.05rem; }
+    .admin-panel .readonly-banner { margin-bottom: 1rem; padding: 0.6rem 0.85rem; border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius); }
+    .admin-panel .rotate-intro { color: var(--pico-muted-color); font-size: 0.85rem; margin: 0 0 1rem; }
+    .admin-panel form { display: grid; gap: 0.4rem; margin-bottom: 1rem; }
+    .admin-panel form > label { font-size: 0.78rem; font-weight: 600; color: var(--pico-muted-color); }
+    .admin-panel form > input, .admin-panel form > textarea { margin: 0; font-family: var(--pico-font-family-monospace); }
+    .admin-panel form > textarea { min-height: 7rem; }
+    .admin-panel form .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .admin-panel form .row button { margin: 0; }
+    .admin-panel form .row .status { font-size: 0.8rem; color: var(--pico-muted-color); }
+    .admin-panel form .row .status.ok { color: #155b29; }
+    .admin-panel form .row .status.err { color: #cf222e; }
+    /* Subtle indicator on the Admin button when writes are disabled. */
+    #adminButton[data-readonly="true"] { opacity: 0.7; }
+    #adminButton[data-readonly="true"]::after { content: " · read-only"; font-size: 0.72rem; opacity: 0.75; }
 
     /* Responsive: collapse stats and toolbar on narrow viewports. */
     @media (max-width: 900px) {
@@ -222,6 +258,7 @@
       </ul>
       <ul>
         <li><span id="lastUpdated" class="last-updated">Not refreshed yet</span></li>
+        <li><button id="adminButton" type="button" class="secondary outline"{{if not .AllowAdminEdit}} data-readonly="true" title="Admin writes are read-only — set ALLOW_ADMIN_EDIT=true to enable"{{end}}>Admin</button></li>
         <li><button id="tokenButton" type="button" class="secondary outline">Token</button></li>
         <li><button id="refreshButton" type="button">Refresh</button></li>
       </ul>
@@ -234,6 +271,50 @@
         <input id="tokenInput" type="password" autocomplete="current-password" placeholder="ADMIN_TOKEN">
         <button id="saveTokenButton" type="submit">Save token</button>
         <button id="clearTokenButton" type="button" class="secondary outline">Clear</button>
+      </form>
+    </article>
+
+    <article id="adminPanel" class="admin-panel" hidden>
+      {{if not .AllowAdminEdit}}
+      <div class="readonly-banner" role="status">
+        Admin writes are disabled. Set <code>ALLOW_ADMIN_EDIT=true</code> in the gharp env to enable retry, cancel, and credential rotation.
+      </div>
+      {{end}}
+
+      <h3 class="admin-section-title">Rotate credentials</h3>
+      <p class="rotate-intro">
+        Rotate on GitHub first (App settings → Webhook secret / Private keys / Client secret),
+        then paste the new value below within a few minutes. GitHub redelivers signature-failed
+        webhooks, so a small window during rotation is safe. Successful rotations show a
+        <code>sha256:</code> fingerprint of the live value so you can confirm without exposing
+        the secret.
+      </p>
+
+      <form id="rotateWebhookForm" data-field="webhook_secret">
+        <label for="rotateWebhookInput">New webhook secret</label>
+        <input id="rotateWebhookInput" type="password" autocomplete="off" placeholder="paste the new webhook secret">
+        <div class="row">
+          <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}}>Rotate webhook secret</button>
+          <span class="status" data-status></span>
+        </div>
+      </form>
+
+      <form id="rotatePEMForm" data-field="pem">
+        <label for="rotatePEMInput">New private key (PEM)</label>
+        <textarea id="rotatePEMInput" autocomplete="off" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea>
+        <div class="row">
+          <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}}>Rotate PEM</button>
+          <span class="status" data-status></span>
+        </div>
+      </form>
+
+      <form id="rotateClientForm" data-field="client_secret">
+        <label for="rotateClientInput">New client secret</label>
+        <input id="rotateClientInput" type="password" autocomplete="off" placeholder="paste the new OAuth client secret">
+        <div class="row">
+          <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}}>Rotate client secret</button>
+          <span class="status" data-status></span>
+        </div>
       </form>
     </article>
 
@@ -319,7 +400,7 @@
         <table>
           <thead>
             <tr>
-              <th>Actions</th>
+              {{if .AllowAdminEdit}}<th>Actions</th>{{end}}
               <th>Status</th>
               <th>Repo</th>
               <th>Workflow</th>
@@ -337,10 +418,16 @@
   <script>
     const tokenKey = "gharp.adminToken";
     const refreshMs = 10000;
+    // Server-rendered so the JS path can mirror the server's
+    // authorization decision and avoid building disabled-looking
+    // controls that would still fire a request.
+    const allowAdminEdit = {{if .AllowAdminEdit}}true{{else}}false{{end}};
     let refreshTimer = null;
     let isLoading = false;
 
     const el = {
+      adminButton: document.getElementById("adminButton"),
+      adminPanel: document.getElementById("adminPanel"),
       authPanel: document.getElementById("authPanel"),
       authForm: document.getElementById("authForm"),
       tokenInput: document.getElementById("tokenInput"),
@@ -486,14 +573,13 @@
 
       for (const job of jobs) {
         const row = document.createElement("tr");
-        row.append(
-          actionsCell(job),
-          cell(statusBadge(job)),
-          repoCell(job),
-          workflowCell(job),
-          runnerCell(job),
-          updatedCell(job.updated_at)
-        );
+        // Actions column is hidden entirely when writes are disabled —
+        // mirrors the conditional <th>Actions</th> in the template so
+        // the column count matches.
+        const cells = allowAdminEdit
+          ? [actionsCell(job), cell(statusBadge(job)), repoCell(job), workflowCell(job), runnerCell(job), updatedCell(job.updated_at)]
+          : [cell(statusBadge(job)), repoCell(job), workflowCell(job), runnerCell(job), updatedCell(job.updated_at)];
+        row.append(...cells);
         el.jobsBody.appendChild(row);
       }
     }
@@ -590,6 +676,7 @@
         wrap.appendChild(actionButton("Cancel", "cancel", job.id, ""));
       }
       if (!wrap.children.length) {
+        wrap.classList.add("empty");
         const span = document.createElement("span");
         span.className = "muted";
         span.textContent = "-";
@@ -600,6 +687,10 @@
     }
 
     function actionButton(label, action, id, variant) {
+      // Caller guarantees allowAdminEdit is true (renderJobs skips the
+      // actions cell entirely otherwise), so we don't need a disabled
+      // fallback path here. The column header is also conditionally
+      // omitted from the template, keeping the column count consistent.
       const button = document.createElement("button");
       button.type = "button";
       if (variant) {
@@ -641,6 +732,9 @@
 
     el.tokenButton.addEventListener("click", showAuth);
     el.refreshButton.addEventListener("click", refresh);
+    el.adminButton.addEventListener("click", () => {
+      el.adminPanel.hidden = !el.adminPanel.hidden;
+    });
     el.applyFiltersButton.addEventListener("click", refresh);
     el.statusCheckboxes.forEach(box => box.addEventListener("change", () => {
       syncClearStatusButton();
@@ -673,6 +767,57 @@
         refresh();
       }
     });
+
+    // Rotate-credentials forms. Each form submits one field — partial
+    // PATCH means an absent field is left untouched server-side, which
+    // matches the per-field "rotate this and only this" UX.
+    function wireRotateForm(formID, inputID) {
+      const form = document.getElementById(formID);
+      if (!form) return;
+      const input = document.getElementById(inputID);
+      const status = form.querySelector("[data-status]");
+      const button = form.querySelector("button[type=submit]");
+      form.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (!allowAdminEdit) return;
+        const value = input.value;
+        if (!value || !value.trim()) {
+          status.textContent = "Enter a value first";
+          status.className = "status err";
+          return;
+        }
+        button.disabled = true;
+        status.textContent = "Rotating…";
+        status.className = "status";
+        try {
+          const body = {};
+          body[form.dataset.field] = value;
+          const res = await apiFetch("/admin/app-config", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const fp = (res && res[form.dataset.field + "_fingerprint"]) || "";
+          if (Array.isArray(res.rotated) && res.rotated.length === 0) {
+            status.textContent = "No change (value matches current)";
+            status.className = "status";
+          } else {
+            status.textContent = "Rotated · " + fp;
+            status.className = "status ok";
+            input.value = "";
+          }
+        } catch (err) {
+          status.textContent = err.message || "rotate failed";
+          status.className = "status err";
+        } finally {
+          button.disabled = !allowAdminEdit;
+        }
+      });
+    }
+
+    wireRotateForm("rotateWebhookForm", "rotateWebhookInput");
+    wireRotateForm("rotatePEMForm", "rotatePEMInput");
+    wireRotateForm("rotateClientForm", "rotateClientInput");
 
     syncClearStatusButton();
     refresh();

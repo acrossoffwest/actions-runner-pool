@@ -16,7 +16,7 @@ import (
 func NewRouter(cfg *config.Config, st store.Store, gh *github.Client, sch *scheduler.Scheduler, log *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
-	dashboard := &handlers.DashboardHandler{Log: log}
+	dashboard := &handlers.DashboardHandler{Cfg: cfg, Log: log}
 	mux.HandleFunc("GET /{$}", dashboard.Get)
 
 	mux.Handle("GET /css/", handlers.CSSHandler())
@@ -40,6 +40,9 @@ func NewRouter(cfg *config.Config, st store.Store, gh *github.Client, sch *sched
 
 	cb := &handlers.CallbackHandler{Cfg: cfg, Store: st, GitHub: gh, Log: log}
 	mux.HandleFunc("GET /github/app/callback", cb.Get)
+
+	appCfgHandler := &handlers.AppConfigHandler{Cfg: cfg, Store: st, Log: log}
+	mux.HandleFunc("PATCH /admin/app-config", appCfgHandler.Patch)
 
 	wh := &handlers.WebhookHandler{Cfg: cfg, Store: st, Scheduler: sch, Log: log}
 	mux.HandleFunc("POST /github/webhook", wh.Post)
