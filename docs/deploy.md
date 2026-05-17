@@ -149,11 +149,17 @@ Push it. On the host, you should see:
 
 ```bash
 docker logs gharp
-# dispatch: runner launched job_id=... container=gharp-...-...
+# dispatch: runner launched job_id=... container=gharp-<instance_id>-<job_id>-<hex>
 
 docker ps
-# ... myoung34/github-runner:latest ... gharp-<job_id>-<hash>
+# ... myoung34/github-runner:latest ... gharp-<instance_id>-<job_id>-<hex>
 ```
+
+The `<instance_id>` segment (6 hex chars by default) is generated on
+first boot and persisted in the `instance` table so two gharp
+deployments sharing a docker daemon don't accidentally sweep each
+other's containers. Override at boot via `GHARP_INSTANCE_ID` if you
+want a stable, human-readable id like `prod` or `ci`.
 
 The runner container should disappear within a few seconds of the job
 finishing in the GitHub UI (it's `--rm` + `EPHEMERAL=1`).
@@ -206,10 +212,23 @@ or use `sqlite3 .backup` from a sidecar container that has the
 
 ### Rotating credentials
 
-`BASE_URL`, the App's private key, and the webhook secret are baked
-into the App at `/setup` time. There's no rotation flow in v1 — to
-change any of them, delete the App on GitHub, wipe the gharp volume
-(`docker volume rm gharp-data`), and re-run `/setup`. See
+`webhook_secret`, the App's private key (`pem`), and the OAuth
+`client_secret` can be rotated in-place via `PATCH /admin/app-config`
+without restarting gharp. See
+[`app-config-rotation.md`](app-config-rotation.md) for the full
+endpoint contract, validation rules, ordering guidance, and curl
+recipes. The endpoint requires `ALLOW_ADMIN_EDIT=true` in the gharp
+env — without it the endpoint returns `403 Forbidden`. If you also
+set `ADMIN_TOKEN` (strongly recommended for any non-localhost
+deployment) every request must include `Authorization: Bearer <token>`;
+**leaving `ADMIN_TOKEN` empty leaves the endpoint open** to anyone
+who can reach gharp once writes are enabled.
+
+`BASE_URL` and the App-level identity (`app_id`, `slug`) cannot be
+rotated — they are baked into the GitHub App at `/setup` time and
+into the webhook callback URL GitHub stores. To change those, delete
+the App on GitHub, wipe the gharp volume (`docker volume rm
+gharp-data`), and re-run `/setup`. See
 [`architecture.md` § 6](architecture.md) for the design rationale.
 
 ### Troubleshooting
@@ -217,9 +236,13 @@ change any of them, delete the App on GitHub, wipe the gharp volume
 - **No webhooks landing.** Confirm `BASE_URL` is reachable from the
   public internet (`curl ${BASE_URL}/setup` from outside your network).
   Check the App's "Recent Deliveries" page on GitHub for HTTP errors.
-- **Webhook 401.** The signing secret in `app_config` doesn't match the
-  one GitHub holds. This usually means you swapped the DB but kept the
-  old App, or vice versa. Re-run `/setup`.
+- **Webhook 401.** The signing secret in `app_config` doesn't match
+  the one GitHub holds. Usually one of: (a) you rotated the secret on
+  GitHub but haven't `PATCH`ed gharp yet (or vice versa) — see
+  [`app-config-rotation.md`](app-config-rotation.md); (b) you swapped
+  the DB but kept the old App, or vice versa — re-run `/setup`. GitHub
+  redelivers signature-failed events automatically, so a short
+  rotation window is safe.
 - **Runners start but never pick up the job.** Check `RUNNER_LABELS` —
   a job is accepted only if every label in its `runs-on` set is
   satisfiable from `RUNNER_LABELS`, `RUNNER_DYNAMIC_LABEL_PREFIXES`, or
@@ -277,12 +300,13 @@ change any of them, delete the App on GitHub, wipe the gharp volume
 
 ### Ops APIs
 
-- `GET /` — serves the built-in dashboard for status, recent jobs, filters, and retry/cancel controls.
+- `GET /` — serves the built-in dashboard for status, recent jobs, filters, retry/cancel controls, and the "Rotate credentials" admin panel.
 - `GET /healthz` — returns `ok`.
 - `GET /jobs` — returns recent jobs as JSON.
 - `GET /jobs/{job_id}` — returns full job detail, including stored webhook payload.
-- `POST /jobs/{job_id}/retry` — retries a completed job locally (status resets to pending and is enqueued).
-- `POST /jobs/{job_id}/cancel` — cancels a pending/dispatched job locally.
+- `POST /jobs/{job_id}/retry` — retries a completed job locally (status resets to pending and is enqueued). **Requires `ALLOW_ADMIN_EDIT=true`** in addition to `ADMIN_TOKEN`.
+- `POST /jobs/{job_id}/cancel` — cancels a pending/dispatched job locally. **Requires `ALLOW_ADMIN_EDIT=true`** in addition to `ADMIN_TOKEN`.
+- `PATCH /admin/app-config` — rotate `webhook_secret`, `pem`, and/or `client_secret` in-place (no restart needed). **Requires `ALLOW_ADMIN_EDIT=true`** in addition to `ADMIN_TOKEN`. Full contract: [`app-config-rotation.md`](app-config-rotation.md).
 - `GET /stats` — returns dashboard-friendly JSON counts for jobs, runners, and capacity.
 - `GET /metrics` — returns Prometheus text-format gauges for current job and runner counts.
 
@@ -302,8 +326,24 @@ as curl clients.
 `/jobs` rows include metadata captured from `workflow_job` payloads:
 `job_name`, `run_id`, `run_attempt`, `workflow_name`.
 
-**Authentication:** if `ADMIN_TOKEN` is unset or empty the endpoints are
-open. If set, every request must include `Authorization: Bearer <token>`.
+**Authentication:** if `ADMIN_TOKEN` is unset or empty the read
+endpoints (`/jobs`, `/stats`, `/metrics`) are open. If set, every
+request must include `Authorization: Bearer <token>`.
+
+**Mutating endpoints** (`POST /jobs/{id}/retry`, `POST /jobs/{id}/cancel`,
+`PATCH /admin/app-config`) additionally require `ALLOW_ADMIN_EDIT=true`
+in gharp's env. The default is `false`, which makes the dashboard
+render those controls disabled and the API return `403 Forbidden`.
+
+The flag is a *kill-switch*, not an authenticator: when `ADMIN_TOKEN`
+is unset and `ALLOW_ADMIN_EDIT=true`, the write endpoints are open to
+anyone who can reach gharp. Set `ADMIN_TOKEN` to a strong random
+value for any non-localhost deployment that enables writes.
+
+Auth ordering is bearer-first: when `ADMIN_TOKEN` is set, a missing
+or wrong bearer always returns `401 Unauthorized`, even with the
+flag off (this is what makes the dashboard's "enter token" prompt
+fire correctly).
 
 ```bash
 # Open mode
@@ -317,12 +357,20 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
 curl -H "Authorization: Bearer $ADMIN_TOKEN" \
   "http://localhost:8080/jobs/123456789"
 
-# Local control actions
+# Local control actions (require ALLOW_ADMIN_EDIT=true on the gharp side)
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
   "http://localhost:8080/jobs/123456789/retry"
 
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
   "http://localhost:8080/jobs/123456789/cancel"
+
+# Rotate the webhook secret (also requires ALLOW_ADMIN_EDIT=true).
+# See docs/app-config-rotation.md for pem + client_secret examples
+# and the ordering guidance ("rotate on GitHub first, then gharp").
+curl -X PATCH -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"webhook_secret":"<new-value-at-least-16-chars>"}' \
+  "http://localhost:8080/admin/app-config"
 
 # Dashboard stats JSON
 curl -H "Authorization: Bearer $ADMIN_TOKEN" \
