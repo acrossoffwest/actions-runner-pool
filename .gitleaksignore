@@ -2,4 +2,4 @@
 # Format: one fingerprint per line (printed by gitleaks next to each finding).
 
 # PEM placeholder text in the rotate-credentials UI form — not a real key.
-internal/httpapi/handlers/templates/dashboard.html:private-key-block:739
+internal/httpapi/handlers/templates/dashboard.html:private-key-block:548

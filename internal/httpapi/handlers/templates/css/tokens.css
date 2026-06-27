@@ -1,164 +1,106 @@
-/**
- * gharp design tokens — shared between the gharp dashboard (WS-F)
- * and the Portal UI (WS-E). Import this file once; build components
- * on top of these custom properties.
- *
- * Variable naming: --g-<category>[-<variant>]
- *
- * Status variables always come in triples:
- *   --g-status-<state>-bg / -border / -text / -dot
- * All statuses have both a color AND a distinct text label
- * (colorblind-safe — never rely on color alone).
- */
-
+/* gharp design tokens — shared by dashboard / setup / setup_done
+   Token names: --bg, --surface, --surface-2/3, --hover, --border/-2,
+   --text/-dim/-faint, --brand/-2/-ink/-a30/-soft,
+   --s-{pending,disp,run,ok,fail,cancel}-{fg,bg,bd},
+   --warn, --danger, --ok, --r-{sm,md,lg,xl}
+*/
 :root {
-  /* Typography */
-  --g-font:      -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --g-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-
-  /* Background layers */
-  --g-bg:              #f6f8fa;
-  --g-bg-subtle:       #eaeef2;
-  --g-surface:         #ffffff;
-  --g-surface-raised:  #ffffff;
-  --g-surface-overlay: #ffffff;
-
-  /* Borders */
-  --g-border:       #d0d7de;
-  --g-border-muted: #d8dee4;
-
-  /* Text */
-  --g-text:       #1f2328;
-  --g-text-muted: #656d76;
-  --g-text-link:  #0969da;
-
-  /* Brand — green, matching GitHub Actions / gharp */
-  --g-brand:    #1a7f37;
-  --g-brand-fg: #ffffff;
-
-  /* ── Status colours (colorblind-safe: always pair with text label) ── */
-
-  /* pending — amber/yellow */
-  --g-status-pending-bg:     #fff8c5;
-  --g-status-pending-border: #d4a72c;
-  --g-status-pending-text:   #7d4e00;
-  --g-status-pending-dot:    #bf8700;
-
-  /* dispatched — blue */
-  --g-status-dispatched-bg:     #ddf4ff;
-  --g-status-dispatched-border: #54aeff;
-  --g-status-dispatched-text:   #0550ae;
-  --g-status-dispatched-dot:    #0969da;
-
-  /* in_progress — green */
-  --g-status-progress-bg:     #dafbe1;
-  --g-status-progress-border: #4ac26b;
-  --g-status-progress-text:   #116329;
-  --g-status-progress-dot:    #1a7f37;
-
-  /* completed/success — neutral */
-  --g-status-success-bg:     #f6f8fa;
-  --g-status-success-border: #d0d7de;
-  --g-status-success-text:   #656d76;
-  --g-status-success-dot:    #8c959f;
-
-  /* completed/failure — red */
-  --g-status-failure-bg:     #ffebe9;
-  --g-status-failure-border: #ff8182;
-  --g-status-failure-text:   #a40e26;
-  --g-status-failure-dot:    #cf222e;
-
-  /* cancelled — muted */
-  --g-status-cancelled-bg:     #f6f8fa;
-  --g-status-cancelled-border: #d0d7de;
-  --g-status-cancelled-text:   #8c959f;
-  --g-status-cancelled-dot:    #8c959f;
-
-  /* ── Interactive ── */
-  --g-btn-primary-bg:       #1a7f37;
-  --g-btn-primary-hover-bg: #116329;
-  --g-btn-primary-fg:       #ffffff;
-  --g-btn-primary-border:   rgba(31, 35, 40, 0.15);
-
-  --g-btn-secondary-bg:       #f6f8fa;
-  --g-btn-secondary-hover-bg: #eaeef2;
-  --g-btn-secondary-fg:       #24292f;
-  --g-btn-secondary-border:   rgba(31, 35, 40, 0.15);
-
-  /* Focus ring */
-  --g-focus-ring: 0 0 0 3px rgba(9, 105, 218, 0.3);
-
-  /* Shape */
-  --g-radius-sm: 4px;
-  --g-radius:    6px;
-  --g-radius-lg: 12px;
-
-  /* Shadows */
-  --g-shadow-sm: 0 1px 0 rgba(31, 35, 40, 0.04);
-  --g-shadow:    0 3px 6px rgba(140, 149, 159, 0.15);
-  --g-shadow-lg: 0 8px 24px rgba(140, 149, 159, 0.20);
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --r-sm: 7px; --r-md: 11px; --r-lg: 16px; --r-xl: 22px;
+  --sp: 4px;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.35);
+  --shadow-2: 0 8px 24px -8px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.35);
+  --shadow-pop: 0 24px 60px -18px rgba(0,0,0,.65), 0 4px 14px rgba(0,0,0,.4);
+  --ring: 0 0 0 3px var(--brand-a30);
+  --maxw: 1320px;
+  --tap: 44px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --g-bg:              #0d1117;
-    --g-bg-subtle:       #161b22;
-    --g-surface:         #161b22;
-    --g-surface-raised:  #21262d;
-    --g-surface-overlay: #2d333b;
+[data-theme="dark"] {
+  --bg:        #0a0d12;
+  --bg-grad:   radial-gradient(1200px 600px at 78% -8%, #11331f12, transparent 60%),
+               radial-gradient(900px 500px at 0% 0%, #15203612, transparent 55%);
+  --surface:   #11151c;
+  --surface-2: #161b24;
+  --surface-3: #1c222d;
+  --hover:     #1f2632;
+  --border:    #242c38;
+  --border-2:  #2e3744;
+  --text:      #e9eef5;
+  --text-dim:  #9aa6b4;
+  --text-faint:#677081;
+  --brand:     #3fb950;
+  --brand-2:   #2ea043;
+  --brand-ink: #04130a;
+  --brand-a30: #3fb95040;
+  --brand-soft:#132a1b;
 
-    --g-border:       #30363d;
-    --g-border-muted: #21262d;
+  --s-pending-fg:#a7b1c0; --s-pending-bg:#1b2230; --s-pending-bd:#2c3647;
+  --s-disp-fg:   #6cb0ff; --s-disp-bg:   #11243b; --s-disp-bd:   #1d3a5c;
+  --s-run-fg:    #58d06a; --s-run-bg:    #0f2a18; --s-run-bd:    #1d4a2c;
+  --s-ok-fg:     #2fd6b6; --s-ok-bg:     #0c2a26; --s-ok-bd:     #154a42;
+  --s-fail-fg:   #f5a05a; --s-fail-bg:   #2c1c10; --s-fail-bd:   #5a3a1c;
+  --s-cancel-fg: #828d9c; --s-cancel-bg: #181c24; --s-cancel-bd: #2a323e;
 
-    --g-text:       #e6edf3;
-    --g-text-muted: #7d8590;
-    --g-text-link:  #58a6ff;
+  --warn:   #f5a05a;
+  --danger: #f0746a;
+  --ok:     #2fd6b6;
+  color-scheme: dark;
+}
 
-    --g-brand:    #3fb950;
-    --g-brand-fg: #0d1117;
+[data-theme="light"] {
+  --bg:        #f4f6f9;
+  --bg-grad:   radial-gradient(1100px 560px at 80% -10%, #2ea04314, transparent 60%),
+               radial-gradient(800px 460px at 0% 0%, #2b62ff0e, transparent 55%);
+  --surface:   #ffffff;
+  --surface-2: #f7f9fc;
+  --surface-3: #eef2f7;
+  --hover:     #eef2f7;
+  --border:    #e2e7ee;
+  --border-2:  #d3dae3;
+  --text:      #0f1722;
+  --text-dim:  #5a6675;
+  --text-faint:#8b97a6;
+  --brand:     #1a7f37;
+  --brand-2:   #176c2f;
+  --brand-ink: #ffffff;
+  --brand-a30: #1a7f3733;
+  --brand-soft:#e7f4ec;
 
-    --g-status-pending-bg:     #2d2200;
-    --g-status-pending-border: #9e6a03;
-    --g-status-pending-text:   #e3b341;
-    --g-status-pending-dot:    #d29922;
+  --s-pending-fg:#4a5666; --s-pending-bg:#eef1f6; --s-pending-bd:#dbe1ea;
+  --s-disp-fg:   #1f64c9; --s-disp-bg:   #e7f0fc; --s-disp-bd:   #c9def8;
+  --s-run-fg:    #157f33; --s-run-bg:    #e6f4ea; --s-run-bd:    #bfe3c8;
+  --s-ok-fg:     #0f8f76; --s-ok-bg:     #e2f5f0; --s-ok-bd:     #bfe7dd;
+  --s-fail-fg:   #b5571a; --s-fail-bg:   #fbeede; --s-fail-bd:   #f0d4b4;
+  --s-cancel-fg: #6b7686; --s-cancel-bg: #f0f2f6; --s-cancel-bd: #dde2ea;
 
-    --g-status-dispatched-bg:     #051d4d;
-    --g-status-dispatched-border: #1f6feb;
-    --g-status-dispatched-text:   #79c0ff;
-    --g-status-dispatched-dot:    #58a6ff;
+  --warn:   #b5571a;
+  --danger: #c0392b;
+  --ok:     #0f8f76;
+  color-scheme: light;
+}
 
-    --g-status-progress-bg:     #0f2e17;
-    --g-status-progress-border: #238636;
-    --g-status-progress-text:   #3fb950;
-    --g-status-progress-dot:    #3fb950;
-
-    --g-status-success-bg:     #21262d;
-    --g-status-success-border: #30363d;
-    --g-status-success-text:   #7d8590;
-    --g-status-success-dot:    #6e7681;
-
-    --g-status-failure-bg:     #2d0f10;
-    --g-status-failure-border: #b62324;
-    --g-status-failure-text:   #ff7b72;
-    --g-status-failure-dot:    #f85149;
-
-    --g-status-cancelled-bg:     #21262d;
-    --g-status-cancelled-border: #30363d;
-    --g-status-cancelled-text:   #6e7681;
-    --g-status-cancelled-dot:    #6e7681;
-
-    --g-btn-primary-bg:       #238636;
-    --g-btn-primary-hover-bg: #2ea043;
-    --g-btn-primary-fg:       #ffffff;
-    --g-btn-primary-border:   rgba(240, 246, 252, 0.1);
-
-    --g-btn-secondary-bg:       #21262d;
-    --g-btn-secondary-hover-bg: #30363d;
-    --g-btn-secondary-fg:       #c9d1d9;
-    --g-btn-secondary-border:   rgba(240, 246, 252, 0.1);
-
-    --g-shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.3);
-    --g-shadow:    0 3px 6px rgba(0, 0, 0, 0.4);
-    --g-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  }
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  background-image: var(--bg-grad);
+  background-attachment: fixed;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.45;
+  letter-spacing: -.01em;
+  min-height: 100vh;
+}
+button { font-family: inherit; cursor: pointer; }
+input, select { font-family: inherit; }
+a { color: inherit; }
+::selection { background: var(--brand-a30); }
+.mono { font-family: var(--mono); }
+.tnum { font-variant-numeric: tabular-nums; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0;
+  margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0;
 }
