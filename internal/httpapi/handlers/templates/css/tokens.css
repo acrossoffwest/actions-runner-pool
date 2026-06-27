@@ -1,0 +1,164 @@
+/**
+ * gharp design tokens — shared between the gharp dashboard (WS-F)
+ * and the Portal UI (WS-E). Import this file once; build components
+ * on top of these custom properties.
+ *
+ * Variable naming: --g-<category>[-<variant>]
+ *
+ * Status variables always come in triples:
+ *   --g-status-<state>-bg / -border / -text / -dot
+ * All statuses have both a color AND a distinct text label
+ * (colorblind-safe — never rely on color alone).
+ */
+
+:root {
+  /* Typography */
+  --g-font:      -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --g-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Background layers */
+  --g-bg:              #f6f8fa;
+  --g-bg-subtle:       #eaeef2;
+  --g-surface:         #ffffff;
+  --g-surface-raised:  #ffffff;
+  --g-surface-overlay: #ffffff;
+
+  /* Borders */
+  --g-border:       #d0d7de;
+  --g-border-muted: #d8dee4;
+
+  /* Text */
+  --g-text:       #1f2328;
+  --g-text-muted: #656d76;
+  --g-text-link:  #0969da;
+
+  /* Brand — green, matching GitHub Actions / gharp */
+  --g-brand:    #1a7f37;
+  --g-brand-fg: #ffffff;
+
+  /* ── Status colours (colorblind-safe: always pair with text label) ── */
+
+  /* pending — amber/yellow */
+  --g-status-pending-bg:     #fff8c5;
+  --g-status-pending-border: #d4a72c;
+  --g-status-pending-text:   #7d4e00;
+  --g-status-pending-dot:    #bf8700;
+
+  /* dispatched — blue */
+  --g-status-dispatched-bg:     #ddf4ff;
+  --g-status-dispatched-border: #54aeff;
+  --g-status-dispatched-text:   #0550ae;
+  --g-status-dispatched-dot:    #0969da;
+
+  /* in_progress — green */
+  --g-status-progress-bg:     #dafbe1;
+  --g-status-progress-border: #4ac26b;
+  --g-status-progress-text:   #116329;
+  --g-status-progress-dot:    #1a7f37;
+
+  /* completed/success — neutral */
+  --g-status-success-bg:     #f6f8fa;
+  --g-status-success-border: #d0d7de;
+  --g-status-success-text:   #656d76;
+  --g-status-success-dot:    #8c959f;
+
+  /* completed/failure — red */
+  --g-status-failure-bg:     #ffebe9;
+  --g-status-failure-border: #ff8182;
+  --g-status-failure-text:   #a40e26;
+  --g-status-failure-dot:    #cf222e;
+
+  /* cancelled — muted */
+  --g-status-cancelled-bg:     #f6f8fa;
+  --g-status-cancelled-border: #d0d7de;
+  --g-status-cancelled-text:   #8c959f;
+  --g-status-cancelled-dot:    #8c959f;
+
+  /* ── Interactive ── */
+  --g-btn-primary-bg:       #1a7f37;
+  --g-btn-primary-hover-bg: #116329;
+  --g-btn-primary-fg:       #ffffff;
+  --g-btn-primary-border:   rgba(31, 35, 40, 0.15);
+
+  --g-btn-secondary-bg:       #f6f8fa;
+  --g-btn-secondary-hover-bg: #eaeef2;
+  --g-btn-secondary-fg:       #24292f;
+  --g-btn-secondary-border:   rgba(31, 35, 40, 0.15);
+
+  /* Focus ring */
+  --g-focus-ring: 0 0 0 3px rgba(9, 105, 218, 0.3);
+
+  /* Shape */
+  --g-radius-sm: 4px;
+  --g-radius:    6px;
+  --g-radius-lg: 12px;
+
+  /* Shadows */
+  --g-shadow-sm: 0 1px 0 rgba(31, 35, 40, 0.04);
+  --g-shadow:    0 3px 6px rgba(140, 149, 159, 0.15);
+  --g-shadow-lg: 0 8px 24px rgba(140, 149, 159, 0.20);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --g-bg:              #0d1117;
+    --g-bg-subtle:       #161b22;
+    --g-surface:         #161b22;
+    --g-surface-raised:  #21262d;
+    --g-surface-overlay: #2d333b;
+
+    --g-border:       #30363d;
+    --g-border-muted: #21262d;
+
+    --g-text:       #e6edf3;
+    --g-text-muted: #7d8590;
+    --g-text-link:  #58a6ff;
+
+    --g-brand:    #3fb950;
+    --g-brand-fg: #0d1117;
+
+    --g-status-pending-bg:     #2d2200;
+    --g-status-pending-border: #9e6a03;
+    --g-status-pending-text:   #e3b341;
+    --g-status-pending-dot:    #d29922;
+
+    --g-status-dispatched-bg:     #051d4d;
+    --g-status-dispatched-border: #1f6feb;
+    --g-status-dispatched-text:   #79c0ff;
+    --g-status-dispatched-dot:    #58a6ff;
+
+    --g-status-progress-bg:     #0f2e17;
+    --g-status-progress-border: #238636;
+    --g-status-progress-text:   #3fb950;
+    --g-status-progress-dot:    #3fb950;
+
+    --g-status-success-bg:     #21262d;
+    --g-status-success-border: #30363d;
+    --g-status-success-text:   #7d8590;
+    --g-status-success-dot:    #6e7681;
+
+    --g-status-failure-bg:     #2d0f10;
+    --g-status-failure-border: #b62324;
+    --g-status-failure-text:   #ff7b72;
+    --g-status-failure-dot:    #f85149;
+
+    --g-status-cancelled-bg:     #21262d;
+    --g-status-cancelled-border: #30363d;
+    --g-status-cancelled-text:   #6e7681;
+    --g-status-cancelled-dot:    #6e7681;
+
+    --g-btn-primary-bg:       #238636;
+    --g-btn-primary-hover-bg: #2ea043;
+    --g-btn-primary-fg:       #ffffff;
+    --g-btn-primary-border:   rgba(240, 246, 252, 0.1);
+
+    --g-btn-secondary-bg:       #21262d;
+    --g-btn-secondary-hover-bg: #30363d;
+    --g-btn-secondary-fg:       #c9d1d9;
+    --g-btn-secondary-border:   rgba(240, 246, 252, 0.1);
+
+    --g-shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.3);
+    --g-shadow:    0 3px 6px rgba(0, 0, 0, 0.4);
+    --g-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+}

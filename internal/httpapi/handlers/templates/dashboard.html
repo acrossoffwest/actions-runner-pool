@@ -5,355 +5,797 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>gharp · Dashboard</title>
   <link rel="icon" href="https://zany.sh/favicon.svg?emoji=🪉">
-  <link rel="stylesheet" href="/css/pico.green.min.css">
+  <link rel="stylesheet" href="/css/tokens.css">
   <style>
-    /* Tighten Pico's default spacing for a denser admin layout. */
-    :root {
-      --pico-spacing: 0.875rem;
-      --pico-block-spacing-vertical: 1rem;
-      --pico-form-element-spacing-vertical: 0.5rem;
-      --pico-form-element-spacing-horizontal: 0.75rem;
-      --pico-typography-spacing-vertical: 0.75rem;
+    /* ── Reset ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 15px; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--g-font);
+      background: var(--g-bg);
+      color: var(--g-text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--g-text-link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Page shell ─────────────────────────────────────────── */
+    .page { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ── Topbar ─────────────────────────────────────────────── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      height: 52px;
+      padding: 0 24px;
+      background: var(--g-surface);
+      border-bottom: 1px solid var(--g-border);
+      gap: 12px;
+    }
+    .topbar-brand {
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      white-space: nowrap;
+    }
+    .topbar-brand-name { font-weight: 700; font-size: 1.05rem; color: var(--g-text); }
+    .topbar-brand-sub  { font-size: 0.78rem; color: var(--g-text-muted); }
+    .topbar-spacer { flex: 1; min-width: 0; }
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: var(--g-text-muted);
+      white-space: nowrap;
+    }
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--g-border);
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .live-dot.live {
+      background: var(--g-brand);
+      animation: livePulse 2.5s ease-in-out infinite;
+    }
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.45; }
     }
 
-    main.container { padding-block: 1.5rem; }
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 12px;
+      border-radius: var(--g-radius);
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      line-height: 1.5;
+      cursor: pointer;
+      white-space: nowrap;
+      border: 1px solid transparent;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+      user-select: none;
+      appearance: none;
+    }
+    .btn:focus-visible { outline: none; box-shadow: var(--g-focus-ring); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+    .btn-primary {
+      background: var(--g-btn-primary-bg);
+      color: var(--g-btn-primary-fg);
+      border-color: var(--g-btn-primary-border);
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--g-btn-primary-hover-bg); }
+    .btn-secondary {
+      background: var(--g-btn-secondary-bg);
+      color: var(--g-btn-secondary-fg);
+      border-color: var(--g-btn-secondary-border);
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--g-btn-secondary-hover-bg); }
+    .btn-sm { padding: 3px 8px; font-size: 0.76rem; }
 
-    /* Header: brand on the left, action buttons on the right. */
-    header > nav .brand { font-size: 1.4rem; font-weight: 700; }
-    header > nav .brand small { color: var(--pico-muted-color); font-weight: 400; margin-left: 0.5rem; }
-    header > nav .last-updated { color: var(--pico-muted-color); font-size: 0.85rem; margin-right: 0.5rem; }
-    header > nav button { margin: 0; }
+    /* ── Form controls ───────────────────────────────────────── */
+    .input, .sel {
+      display: block;
+      width: 100%;
+      padding: 5px 11px;
+      background: var(--g-surface);
+      color: var(--g-text);
+      border: 1px solid var(--g-border);
+      border-radius: var(--g-radius);
+      font-family: inherit;
+      font-size: 0.84rem;
+      line-height: 1.5;
+      appearance: none;
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .input::placeholder { color: var(--g-text-muted); }
+    .input:focus, .sel:focus {
+      outline: none;
+      border-color: #0969da;
+      box-shadow: var(--g-focus-ring);
+    }
+    .input[type=password] { font-family: var(--g-font-mono); letter-spacing: 0.05em; }
+    textarea.input { min-height: 100px; resize: vertical; font-family: var(--g-font-mono); font-size: 0.78rem; }
+    .sel {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23656d76' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 9px center;
+      padding-right: 28px;
+      cursor: pointer;
+    }
+    @media (prefers-color-scheme: dark) {
+      .sel {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237d8590' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      }
+    }
 
-    /* Compact stat tiles. */
+    /* ── Cards / panels ──────────────────────────────────────── */
+    .card {
+      background: var(--g-surface);
+      border: 1px solid var(--g-border);
+      border-radius: var(--g-radius-lg);
+    }
+
+    /* ── Main layout ─────────────────────────────────────────── */
+    #app {
+      flex: 1;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 20px 24px 48px;
+      width: 100%;
+    }
+
+    /* ── Auth panel ──────────────────────────────────────────── */
+    #authPanel {
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+    #authForm {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    #authForm .input { flex: 1; min-width: 200px; max-width: 340px; }
+
+    /* ── Admin panel ─────────────────────────────────────────── */
+    #adminPanel { padding: 20px; margin-bottom: 14px; }
+    .admin-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 12px; }
+    .admin-intro { font-size: 0.82rem; color: var(--g-text-muted); margin-bottom: 16px; line-height: 1.6; }
+    .admin-intro code {
+      font-family: var(--g-font-mono);
+      font-size: 0.85em;
+      background: var(--g-bg-subtle);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .admin-section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--g-border); }
+    .admin-section-label { font-size: 0.8rem; font-weight: 600; margin-bottom: 8px; color: var(--g-text); }
+    .admin-form { display: grid; gap: 8px; }
+    .admin-form-label { font-size: 0.75rem; font-weight: 600; color: var(--g-text-muted); }
+    .admin-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .admin-form-status { font-size: 0.78rem; color: var(--g-text-muted); }
+    .admin-form-status.ok  { color: var(--g-status-progress-text); }
+    .admin-form-status.err { color: var(--g-status-failure-text); }
+
+    /* Read-only banner */
+    .readonly-banner {
+      padding: 10px 14px;
+      background: var(--g-status-pending-bg);
+      border: 1px solid var(--g-status-pending-border);
+      border-radius: var(--g-radius);
+      font-size: 0.82rem;
+      color: var(--g-status-pending-text);
+      margin-bottom: 14px;
+    }
+    .readonly-banner code {
+      font-family: var(--g-font-mono);
+      font-size: 0.85em;
+      background: rgba(0, 0, 0, 0.07);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    /* Error banner */
+    #errorBanner {
+      padding: 10px 14px;
+      background: var(--g-status-failure-bg);
+      border: 1px solid var(--g-status-failure-border);
+      border-radius: var(--g-radius);
+      font-size: 0.84rem;
+      color: var(--g-status-failure-text);
+      margin-bottom: 14px;
+    }
+
+    /* Admin button read-only hint */
+    #adminButton[data-readonly="true"] { opacity: 0.75; }
+    #adminButton[data-readonly="true"]::after {
+      content: " · read-only";
+      font-size: 0.7rem;
+      opacity: 0.8;
+    }
+
+    /* ── Stats ───────────────────────────────────────────────── */
     .stats {
       display: grid;
       grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 0.75rem;
-      margin-bottom: var(--pico-block-spacing-vertical);
+      gap: 10px;
+      margin-bottom: 12px;
     }
-    .stat {
-      margin: 0;
-      padding: 0.875rem 1rem;
-    }
+    .stat { padding: 14px 16px; }
     .stat .label {
-      color: var(--pico-muted-color);
-      font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
+      font-size: 0.68rem;
+      font-weight: 700;
       text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--g-text-muted);
+      margin-bottom: 6px;
     }
     .stat .value {
-      margin-top: 0.4rem;
-      font-size: 1.75rem;
+      font-size: 1.8rem;
       font-weight: 700;
       line-height: 1;
+      font-variant-numeric: tabular-nums;
     }
     .stat .note {
-      margin-top: 0.4rem;
-      color: var(--pico-muted-color);
-      font-size: 0.78rem;
+      font-size: 0.72rem;
+      color: var(--g-text-muted);
+      margin-top: 4px;
     }
 
-    /* Capacity bar with threshold-based color states. */
-    .capacity { margin-bottom: var(--pico-block-spacing-vertical); }
+    /* ── Capacity ─────────────────────────────────────────────── */
+    .capacity { padding: 12px 16px; margin-bottom: 12px; }
     .capacity-head {
       display: flex;
       justify-content: space-between;
-      gap: 0.75rem;
-      margin-bottom: 0.5rem;
-      color: var(--pico-muted-color);
-    }
-    .capacity progress { margin: 0; height: 0.6rem; }
-    /* Pico's themed bundle doesn't expose its raw color palette as
-       custom properties, so we hard-code the warn/full hues to match
-       the badge palette used elsewhere on the page. */
-    .capacity progress[data-state="warn"]::-webkit-progress-value { background: #d4a72c; }
-    .capacity progress[data-state="warn"]::-moz-progress-bar { background: #d4a72c; }
-    .capacity progress[data-state="full"]::-webkit-progress-value { background: #cf222e; }
-    .capacity progress[data-state="full"]::-moz-progress-bar { background: #cf222e; }
-
-    /* Filters: status on its own row, then repo + limit + apply. */
-    .toolbar { margin-bottom: var(--pico-block-spacing-vertical); }
-    .toolbar label.field-label {
-      display: block;
-      margin-bottom: 0.4rem;
-      color: var(--pico-muted-color);
-      font-size: 0.78rem;
+      align-items: center;
+      font-size: 0.84rem;
       font-weight: 600;
+      margin-bottom: 8px;
     }
-    .toolbar .filter-row + .filter-row { margin-top: 0.85rem; }
-    .toolbar .filter-row.controls {
-      display: grid;
-      grid-template-columns: minmax(200px, 1fr) 110px auto;
-      gap: 0.75rem;
-      align-items: end;
-    }
-    .toolbar input, .toolbar select { margin: 0; }
-    .toolbar button { margin: 0; height: 2.4rem; }
+    #capacityText { font-weight: 400; color: var(--g-text-muted); }
 
+    progress {
+      appearance: none;
+      -webkit-appearance: none;
+      display: block;
+      width: 100%;
+      height: 6px;
+      border: none;
+      border-radius: 999px;
+      background: var(--g-bg-subtle);
+    }
+    progress::-webkit-progress-bar   { background: var(--g-bg-subtle); border-radius: 999px; }
+    progress::-webkit-progress-value { background: var(--g-brand); border-radius: 999px; transition: width 0.35s ease; }
+    progress::-moz-progress-bar      { background: var(--g-brand); border-radius: 999px; }
+
+    progress[data-state="warn"]::-webkit-progress-value { background: var(--g-status-pending-dot); }
+    progress[data-state="warn"]::-moz-progress-bar      { background: var(--g-status-pending-dot); }
+    progress[data-state="full"]::-webkit-progress-value { background: var(--g-status-failure-dot); }
+    progress[data-state="full"]::-moz-progress-bar      { background: var(--g-status-failure-dot); }
+
+    /* ── Toolbar ──────────────────────────────────────────────── */
+    .toolbar { padding: 14px 16px; margin-bottom: 12px; }
+    .toolbar-label {
+      display: block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--g-text-muted);
+      margin-bottom: 8px;
+    }
     .status-checks {
       display: flex;
       flex-wrap: wrap;
-      gap: 1rem;
       align-items: center;
+      gap: 5px;
+      margin-bottom: 12px;
     }
     .status-check {
+      position: relative;
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      margin: 0;
-      font-size: 0.9rem;
-      cursor: pointer;
-      user-select: none;
-    }
-    .status-check input { margin: 0; }
-    .status-clear {
-      margin-left: auto;
-      padding: 0.15rem 0.6rem;
-      background: transparent;
-      border: 0;
-      color: var(--pico-muted-color);
+      gap: 5px;
+      padding: 3px 10px;
+      border: 1px solid var(--g-border);
+      border-radius: 999px;
       font-size: 0.8rem;
       cursor: pointer;
+      user-select: none;
+      color: var(--g-text-muted);
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
     }
-    .status-clear:hover { color: var(--pico-primary); }
-    .status-clear:disabled { color: var(--pico-muted-color); opacity: 0.45; cursor: not-allowed; }
+    /* Overlay the real checkbox over the whole label so Playwright can
+       interact with it, while the label text provides the visual. */
+    .status-check input[type=checkbox] {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      margin: 0;
+      appearance: none;
+    }
+    .status-check:hover { background: var(--g-bg-subtle); color: var(--g-text); }
+    /* :has() is broadly supported in modern browsers */
+    .status-check:has(input:checked) {
+      background: var(--g-bg-subtle);
+      border-color: var(--g-text-muted);
+      color: var(--g-text);
+      font-weight: 600;
+    }
+    .status-clear {
+      margin-left: 4px;
+      font-size: 0.76rem;
+      color: var(--g-text-muted);
+      background: transparent;
+      border: none;
+      font-family: inherit;
+      cursor: pointer;
+      padding: 3px 6px;
+    }
+    .status-clear:hover:not(:disabled) { color: var(--g-text); }
+    .status-clear:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* Jobs table: collapse Pico's vertical padding a bit, allow scroll. */
-    .jobs-card { padding: 0; overflow: hidden; }
+    .filter-controls {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .filter-field { display: flex; flex-direction: column; gap: 4px; }
+    .filter-field > label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--g-text-muted);
+    }
+    #repoInput  { width: 220px; }
+    #limitInput { width: 88px; }
+
+    /* ── Jobs table ───────────────────────────────────────────── */
+    .jobs-card { overflow: hidden; }
     .jobs-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
-      padding: 0.875rem 1.125rem;
-      border-bottom: 1px solid var(--pico-muted-border-color);
+      gap: 8px;
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--g-border);
     }
-    .jobs-title { font-size: 1rem; font-weight: 700; }
-    .jobs-count { color: var(--pico-muted-color); font-size: 0.85rem; }
-    .jobs-wrap { overflow-x: auto; }
-    .jobs-wrap table { margin: 0; }
-    .jobs-wrap th, .jobs-wrap td { white-space: nowrap; }
-    .jobs-wrap th {
-      color: var(--pico-muted-color);
-      font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    /* Repo column inherits the table-wide `nowrap` so each line
-       (repo on top, job_name in the muted sub) stays single-line
-       and the column's natural minimum is the wider of the two
-       texts. width:100% under `table-layout: auto` lets the column
-       grow past that minimum to fill leftover horizontal space on
-       wide screens; the wrapper's overflow-x:auto handles the case
-       where the row truly can't fit the viewport. */
-    .jobs-wrap td.main-cell { width: 100%; }
-    .jobs-wrap td.muted, .jobs-wrap .muted { color: var(--pico-muted-color); font-size: 0.85rem; }
-    .empty {
-      padding: 2rem 1rem;
-      text-align: center;
-      color: var(--pico-muted-color);
-    }
+    .jobs-title { font-size: 0.9rem; font-weight: 700; }
+    .jobs-count { font-size: 0.8rem; color: var(--g-text-muted); }
+    .jobs-wrap  { overflow-x: auto; }
 
-    /* Status pills: subtle backgrounds keyed off Pico color tokens. */
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: var(--g-bg-subtle); }
+    th {
+      padding: 7px 12px;
+      text-align: left;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--g-text-muted);
+      white-space: nowrap;
+      border-bottom: 1px solid var(--g-border);
+    }
+    td {
+      padding: 9px 12px;
+      vertical-align: middle;
+      border-bottom: 1px solid var(--g-border-muted);
+      font-size: 0.84rem;
+      white-space: nowrap;
+    }
+    #jobsBody tr:last-child td { border-bottom: none; }
+
+    /* Rows clickable to open drawer */
+    #jobsBody tr {
+      cursor: pointer;
+      transition: background 0.08s;
+    }
+    #jobsBody tr:hover { background: var(--g-bg-subtle); }
+    #jobsBody tr.skeleton-row { cursor: default; }
+    #jobsBody tr.skeleton-row:hover { background: transparent; }
+
+    /* Main cell — repo + job_name, can grow */
+    .main-cell { width: 100%; white-space: normal; min-width: 160px; }
+
+    /* Org group heading above the repo name on the first row of each org */
+    .cell-org {
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--g-text-muted);
+      margin-bottom: 2px;
+    }
+    .cell-primary { font-weight: 500; }
+    .cell-sub { font-size: 0.77rem; color: var(--g-text-muted); margin-top: 1px; }
+
+    /* ── Badges ───────────────────────────────────────────────── */
     .badge {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      padding: 0.15rem 0.55rem;
+      gap: 5px;
+      padding: 2px 8px 2px 6px;
       border-radius: 999px;
-      border: 1px solid var(--pico-muted-border-color);
-      background: var(--pico-card-background-color);
-      color: var(--pico-muted-color);
-      font-size: 0.75rem;
+      font-size: 0.76rem;
       font-weight: 600;
-      min-width: 6rem;
+      white-space: nowrap;
+      border: 1px solid;
+      line-height: 1.4;
     }
-    /* Backgrounds are desaturated against the GitHub palette so the
-       table row reads first and the status pill recedes; text/border
-       keep enough hue to be unambiguous at a glance. */
-    .badge.pending     { color: #6b4d00; border-color: #d4c79a; background: #f1ecdb; }
-    .badge.dispatched  { color: #0a4f9c; border-color: #b6cae0; background: #e6edf4; }
-    .badge.in_progress { color: #155b29; border-color: #b8d4c1; background: #e6ede8; }
-    .badge.completed   { color: var(--pico-muted-color); }
-    .badge.bad         { color: #9b1c1c; border-color: #d8b9b6; background: #f1e3e1; }
+    /* Color dot — different shapes for additional differentiation */
+    .badge::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
 
-    .row-actions { display: flex; gap: 0.4rem; }
-    .row-actions button { margin: 0; padding: 0.25rem 0.65rem; font-size: 0.8rem; min-width: 4.5rem; }
-    /* When the cell has no actionable button (e.g. an in_progress row),
-       the placeholder dash should sit centered rather than left-aligned
-       against the column edge. */
-    .row-actions.empty { justify-content: center; }
+    .badge.pending {
+      color: var(--g-status-pending-text);
+      background: var(--g-status-pending-bg);
+      border-color: var(--g-status-pending-border);
+    }
+    .badge.pending::before { background: var(--g-status-pending-dot); }
 
-    /* Auth + alert articles render compactly. */
-    .auth-panel form {
-      display: grid;
-      grid-template-columns: minmax(220px, 1fr) auto auto;
-      gap: 0.5rem;
+    .badge.dispatched {
+      color: var(--g-status-dispatched-text);
+      background: var(--g-status-dispatched-bg);
+      border-color: var(--g-status-dispatched-border);
+    }
+    .badge.dispatched::before { background: var(--g-status-dispatched-dot); border-radius: 2px; }
+
+    .badge.in_progress {
+      color: var(--g-status-progress-text);
+      background: var(--g-status-progress-bg);
+      border-color: var(--g-status-progress-border);
+    }
+    .badge.in_progress::before {
+      background: var(--g-status-progress-dot);
+      animation: spin 1.2s linear infinite;
+      border-radius: 50% 50% 50% 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .badge.completed {
+      color: var(--g-status-success-text);
+      background: var(--g-status-success-bg);
+      border-color: var(--g-status-success-border);
+    }
+    .badge.completed::before { background: var(--g-status-success-dot); border-radius: 2px; }
+
+    .badge.bad {
+      color: var(--g-status-failure-text);
+      background: var(--g-status-failure-bg);
+      border-color: var(--g-status-failure-border);
+    }
+    .badge.bad::before { background: var(--g-status-failure-dot); width: 6px; height: 6px; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+
+    /* ── Row actions ──────────────────────────────────────────── */
+    .row-actions { display: flex; gap: 4px; }
+    .row-actions.empty { justify-content: center; color: var(--g-text-muted); }
+
+    /* ── Empty state ──────────────────────────────────────────── */
+    #emptyState {
+      padding: 40px 16px;
+      text-align: center;
+    }
+    .empty-icon { font-size: 1.8rem; margin-bottom: 10px; opacity: 0.3; }
+    .empty-title { font-weight: 600; margin-bottom: 4px; }
+    .empty-desc  { font-size: 0.84rem; color: var(--g-text-muted); }
+
+    /* ── Skeleton animation ───────────────────────────────────── */
+    @keyframes shimmer {
+      0%   { background-position: -300% 0; }
+      100% { background-position:  300% 0; }
+    }
+    .skeleton {
+      height: 13px;
+      border-radius: 4px;
+      background: linear-gradient(
+        90deg,
+        var(--g-bg-subtle) 25%,
+        var(--g-border-muted) 50%,
+        var(--g-bg-subtle) 75%
+      );
+      background-size: 300% 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+
+    /* ── Job detail drawer ───────────────────────────────────── */
+    .drawer {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      pointer-events: none;
+    }
+    .drawer[aria-hidden="false"] { pointer-events: auto; }
+
+    .drawer-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0);
+      transition: background 0.2s;
+    }
+    .drawer[aria-hidden="false"] .drawer-backdrop {
+      background: rgba(0, 0, 0, 0.45);
+    }
+
+    .drawer-panel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(460px, 100vw);
+      background: var(--g-surface);
+      border-left: 1px solid var(--g-border);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--g-shadow-lg);
+      overflow: hidden;
+    }
+    .drawer[aria-hidden="false"] .drawer-panel { transform: none; }
+
+    .drawer-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--g-border);
+      flex-shrink: 0;
+    }
+    .drawer-head-info {}
+    .drawer-job-name { font-size: 0.95rem; font-weight: 700; margin-bottom: 2px; }
+    .drawer-job-sub  { font-size: 0.8rem; color: var(--g-text-muted); }
+    .drawer-close-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
       align-items: center;
-      margin: 0;
+      justify-content: center;
+      background: transparent;
+      border: 1px solid var(--g-border);
+      border-radius: var(--g-radius);
+      cursor: pointer;
+      font-size: 0.95rem;
+      color: var(--g-text-muted);
+      font-family: inherit;
+      flex-shrink: 0;
+      transition: background 0.1s, color 0.1s;
     }
-    .auth-panel input, .auth-panel button { margin: 0; }
-    .alert {
-      border-color: #f0b8b8;
-      background: #ffebe9;
-      color: #cf222e;
-    }
+    .drawer-close-btn:hover { background: var(--g-bg-subtle); color: var(--g-text); }
+    .drawer-close-btn:focus-visible { outline: none; box-shadow: var(--g-focus-ring); }
 
-    /* Read-only banner shown when ALLOW_ADMIN_EDIT is false. */
-    .readonly-banner {
-      border-color: #d4c79a;
-      background: #fbf7e2;
-      color: #6b4d00;
-      font-size: 0.85rem;
+    #drawerBody {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
     }
-    .readonly-banner code {
-      background: rgba(0,0,0,0.06);
-      padding: 0 0.3rem;
-      border-radius: 0.2rem;
+    .drawer-section-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--g-text-muted);
+      margin-bottom: 8px;
     }
+    .drawer-meta { display: grid; grid-template-columns: 80px 1fr; gap: 5px 10px; }
+    .drawer-meta-key { font-size: 0.81rem; color: var(--g-text-muted); font-weight: 500; }
+    .drawer-meta-val { font-size: 0.81rem; font-weight: 500; word-break: break-all; }
+    .drawer-meta-val.mono { font-family: var(--g-font-mono); font-size: 0.78rem; }
 
-    /* Admin panel (opened by the "Admin" button in the header).
-       Holds the read-only banner and the rotate-credentials forms.
-       Hidden by default to keep the main read view uncluttered. */
-    .admin-panel .admin-section-title { margin: 0 0 0.5rem; font-size: 1.05rem; }
-    .admin-panel .readonly-banner { margin-bottom: 1rem; padding: 0.6rem 0.85rem; border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius); }
-    .admin-panel .rotate-intro { color: var(--pico-muted-color); font-size: 0.85rem; margin: 0 0 1rem; }
-    .admin-panel form { display: grid; gap: 0.4rem; margin-bottom: 1rem; }
-    .admin-panel form > label { font-size: 0.78rem; font-weight: 600; color: var(--pico-muted-color); }
-    .admin-panel form > input, .admin-panel form > textarea { margin: 0; font-family: var(--pico-font-family-monospace); }
-    .admin-panel form > textarea { min-height: 7rem; }
-    .admin-panel form .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-    .admin-panel form .row button { margin: 0; }
-    .admin-panel form .row .status { font-size: 0.8rem; color: var(--pico-muted-color); }
-    .admin-panel form .row .status.ok { color: #155b29; }
-    .admin-panel form .row .status.err { color: #cf222e; }
-    /* Subtle indicator on the Admin button when writes are disabled. */
-    #adminButton[data-readonly="true"] { opacity: 0.7; }
-    #adminButton[data-readonly="true"]::after { content: " · read-only"; font-size: 0.72rem; opacity: 0.75; }
-
-    /* Responsive: collapse stats and toolbar on narrow viewports. */
-    @media (max-width: 900px) {
-      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      header > nav { flex-wrap: wrap; }
+    /* Timeline */
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+    .tl-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding-bottom: 14px;
+      position: relative;
     }
-    /* On phone-width, promote Repo to span the full row, leave
-       Limit and Apply on the next line side-by-side. */
-    @media (max-width: 600px) {
-      .toolbar .filter-row.controls {
-        grid-template-columns: 110px 1fr;
-      }
-      .toolbar .filter-row.controls > div:first-child {
-        grid-column: 1 / -1;
-      }
+    .tl-item::before {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 16px;
+      bottom: 0;
+      width: 1px;
+      background: var(--g-border);
+    }
+    .tl-item:last-child::before { display: none; }
+    .tl-dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      border: 2px solid var(--g-border);
+      background: var(--g-surface);
+      flex-shrink: 0;
+      margin-top: 2px;
+      position: relative;
+      z-index: 1;
+    }
+    .tl-dot.done   { border-color: var(--g-text-muted); background: var(--g-text-muted); }
+    .tl-dot.active { border-color: var(--g-brand); background: var(--g-brand); }
+    .tl-dot.error  { border-color: var(--g-status-failure-dot); background: var(--g-status-failure-dot); }
+    .tl-label { font-size: 0.82rem; font-weight: 600; }
+    .tl-desc  { font-size: 0.76rem; color: var(--g-text-muted); margin-top: 1px; }
+
+    .drawer-gh-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.82rem;
+      color: var(--g-text-link);
+      margin-top: 8px;
+    }
+    .drawer-gh-link:hover { text-decoration: underline; }
+    .drawer-actions { display: flex; gap: 8px; }
+
+    /* ── Responsive ──────────────────────────────────────────── */
+    @media (max-width: 960px) {
+      .stats { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      #app { padding: 14px 16px 32px; }
+      .topbar { padding: 0 16px; }
+      .topbar-brand-sub { display: none; }
+      #repoInput { width: 150px; }
     }
   </style>
 </head>
 <body>
-  <header class="container">
-    <nav>
-      <ul>
-        <li class="brand">gharp <small>GitHub Actions Runner Pool</small></li>
-      </ul>
-      <ul>
-        <li><span id="lastUpdated" class="last-updated">Not refreshed yet</span></li>
-        <li><button id="adminButton" type="button" class="secondary outline"{{if not .AllowAdminEdit}} data-readonly="true" title="Admin writes are read-only — set ALLOW_ADMIN_EDIT=true to enable"{{end}}>Admin</button></li>
-        <li><button id="tokenButton" type="button" class="secondary outline">Token</button></li>
-        <li><button id="refreshButton" type="button">Refresh</button></li>
-      </ul>
-    </nav>
+<div class="page">
+
+  <!-- ── Top bar ─────────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="topbar-brand-name">gharp</span>
+      <span class="topbar-brand-sub">GitHub Actions Runner Pool</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-right">
+      <div class="live-indicator">
+        <span id="liveDot" class="live-dot" aria-hidden="true"></span>
+        <span id="lastUpdated">Not refreshed yet</span>
+      </div>
+      <button id="adminButton" type="button" class="btn btn-secondary"{{if not .AllowAdminEdit}} data-readonly="true" title="Admin writes disabled — set ALLOW_ADMIN_EDIT=true to enable"{{end}}>Admin</button>
+      <button id="tokenButton" type="button" class="btn btn-secondary">Token</button>
+      <button id="refreshButton" type="button" class="btn btn-primary">Refresh</button>
+    </div>
   </header>
 
-  <main id="app" class="container">
-    <article id="authPanel" class="auth-panel" hidden>
-      <form id="authForm">
-        <input id="tokenInput" type="password" autocomplete="current-password" placeholder="ADMIN_TOKEN">
-        <button id="saveTokenButton" type="submit">Save token</button>
-        <button id="clearTokenButton" type="button" class="secondary outline">Clear</button>
-      </form>
-    </article>
+  <!-- ── Main content ────────────────────────────────────────── -->
+  <main id="app">
 
-    <article id="adminPanel" class="admin-panel" hidden>
+    <!-- Token panel -->
+    <div id="authPanel" class="card" hidden>
+      <form id="authForm">
+        <input id="tokenInput" class="input" type="password" autocomplete="current-password" placeholder="ADMIN_TOKEN">
+        <button id="saveTokenButton" type="submit" class="btn btn-primary">Save token</button>
+        <button id="clearTokenButton" type="button" class="btn btn-secondary">Clear</button>
+      </form>
+    </div>
+
+    <!-- Admin panel -->
+    <div id="adminPanel" class="card" hidden>
       {{if not .AllowAdminEdit}}
       <div class="readonly-banner" role="status">
         Admin writes are disabled. Set <code>ALLOW_ADMIN_EDIT=true</code> in the gharp env to enable retry, cancel, and credential rotation.
       </div>
       {{end}}
 
-      <h3 class="admin-section-title">Rotate credentials</h3>
-      <p class="rotate-intro">
+      <div class="admin-title">Rotate credentials</div>
+      <p class="admin-intro">
         Rotate on GitHub first (App settings → Webhook secret / Private keys / Client secret),
-        then paste the new value below within a few minutes. GitHub redelivers signature-failed
-        webhooks, so a small window during rotation is safe. Successful rotations show a
-        <code>sha256:</code> fingerprint of the live value so you can confirm without exposing
-        the secret.
+        then paste the new value here within a few minutes. Successful rotations confirm with the
+        <code>sha256:</code> fingerprint so you can verify without exposing the secret.
       </p>
 
-      <form id="rotateWebhookForm" data-field="webhook_secret">
-        <label for="rotateWebhookInput">New webhook secret</label>
-        <input id="rotateWebhookInput" type="password" autocomplete="off" placeholder="paste the new webhook secret">
-        <div class="row">
-          <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}}>Rotate webhook secret</button>
-          <span class="status" data-status></span>
-        </div>
-      </form>
+      <div class="admin-section">
+        <div class="admin-section-label">Webhook secret</div>
+        <form id="rotateWebhookForm" data-field="webhook_secret" class="admin-form">
+          <label class="admin-form-label" for="rotateWebhookInput">New webhook secret</label>
+          <input id="rotateWebhookInput" class="input" type="password" autocomplete="off" placeholder="paste the new webhook secret">
+          <div class="admin-form-row">
+            <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}} class="btn btn-secondary btn-sm">Rotate</button>
+            <span class="admin-form-status" data-status></span>
+          </div>
+        </form>
+      </div>
 
-      <form id="rotatePEMForm" data-field="pem">
-        <label for="rotatePEMInput">New private key (PEM)</label>
-        <textarea id="rotatePEMInput" autocomplete="off" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea>
-        <div class="row">
-          <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}}>Rotate PEM</button>
-          <span class="status" data-status></span>
-        </div>
-      </form>
+      <div class="admin-section">
+        <div class="admin-section-label">Private key (PEM)</div>
+        <form id="rotatePEMForm" data-field="pem" class="admin-form">
+          <label class="admin-form-label" for="rotatePEMInput">New private key</label>
+          <textarea id="rotatePEMInput" class="input" autocomplete="off" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea>
+          <div class="admin-form-row">
+            <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}} class="btn btn-secondary btn-sm">Rotate</button>
+            <span class="admin-form-status" data-status></span>
+          </div>
+        </form>
+      </div>
 
-      <form id="rotateClientForm" data-field="client_secret">
-        <label for="rotateClientInput">New client secret</label>
-        <input id="rotateClientInput" type="password" autocomplete="off" placeholder="paste the new OAuth client secret">
-        <div class="row">
-          <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}}>Rotate client secret</button>
-          <span class="status" data-status></span>
-        </div>
-      </form>
-    </article>
+      <div class="admin-section">
+        <div class="admin-section-label">OAuth client secret</div>
+        <form id="rotateClientForm" data-field="client_secret" class="admin-form">
+          <label class="admin-form-label" for="rotateClientInput">New client secret</label>
+          <input id="rotateClientInput" class="input" type="password" autocomplete="off" placeholder="paste the new OAuth client secret">
+          <div class="admin-form-row">
+            <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}} class="btn btn-secondary btn-sm">Rotate</button>
+            <span class="admin-form-status" data-status></span>
+          </div>
+        </form>
+      </div>
+    </div>
 
-    <article id="errorBanner" class="alert" role="alert" hidden></article>
+    <!-- Error banner -->
+    <div id="errorBanner" role="alert" hidden></div>
 
+    <!-- ── Stats grid ─────────────────────────────────────────── -->
     <section class="stats" aria-label="Current status">
-      <article class="stat">
+      <article class="card stat">
         <div class="label">Pending</div>
-        <div id="statPending" class="value">0</div>
+        <div id="statPending" class="value">—</div>
         <div class="note">Waiting for runners</div>
       </article>
-      <article class="stat">
+      <article class="card stat">
         <div class="label">Dispatched</div>
-        <div id="statDispatched" class="value">0</div>
+        <div id="statDispatched" class="value">—</div>
         <div class="note">Runner launched</div>
       </article>
-      <article class="stat">
+      <article class="card stat">
         <div class="label">In progress</div>
-        <div id="statInProgress" class="value">0</div>
+        <div id="statInProgress" class="value">—</div>
         <div class="note">Bound to runner</div>
       </article>
-      <article class="stat">
+      <article class="card stat">
         <div class="label">Completed</div>
-        <div id="statCompleted" class="value">0</div>
+        <div id="statCompleted" class="value">—</div>
         <div class="note">Terminal jobs</div>
       </article>
-      <article class="stat">
+      <article class="card stat">
         <div class="label">Active runners</div>
-        <div id="statActive" class="value">0</div>
+        <div id="statActive" class="value">—</div>
         <div class="note">Starting, idle, busy</div>
       </article>
-      <article class="stat">
+      <article class="card stat">
         <div class="label">Available slots</div>
-        <div id="statAvailable" class="value">0</div>
+        <div id="statAvailable" class="value">—</div>
         <div id="capacityNote" class="note">Capacity unknown</div>
       </article>
     </section>
 
-    <article class="capacity">
+    <!-- ── Capacity bar ───────────────────────────────────────── -->
+    <article class="card capacity">
       <div class="capacity-head">
         <strong>Runner capacity</strong>
         <span id="capacityText">0 / 0 active</span>
@@ -361,25 +803,24 @@
       <progress id="capacityFill" value="0" max="100"></progress>
     </article>
 
-    <article class="toolbar" aria-label="Job filters">
-      <div class="filter-row">
-        <label class="field-label">Status</label>
-        <div class="status-checks">
-          <label class="status-check"><input type="checkbox" name="status" value="pending"> pending</label>
-          <label class="status-check"><input type="checkbox" name="status" value="dispatched"> dispatched</label>
-          <label class="status-check"><input type="checkbox" name="status" value="in_progress"> in progress</label>
-          <label class="status-check"><input type="checkbox" name="status" value="completed"> completed</label>
-          <button id="clearStatusButton" type="button" class="status-clear" disabled>Clear all</button>
-        </div>
+    <!-- ── Filters ────────────────────────────────────────────── -->
+    <article class="card toolbar" aria-label="Job filters">
+      <span class="toolbar-label">Status</span>
+      <div class="status-checks">
+        <label class="status-check"><input type="checkbox" name="status" value="pending"> pending</label>
+        <label class="status-check"><input type="checkbox" name="status" value="dispatched"> dispatched</label>
+        <label class="status-check"><input type="checkbox" name="status" value="in_progress"> in progress</label>
+        <label class="status-check"><input type="checkbox" name="status" value="completed"> completed</label>
+        <button id="clearStatusButton" type="button" class="status-clear" disabled>Clear all</button>
       </div>
-      <div class="filter-row controls">
-        <div>
-          <label class="field-label" for="repoInput">Repo</label>
-          <input id="repoInput" type="text" placeholder="owner/name">
+      <div class="filter-controls">
+        <div class="filter-field">
+          <label for="repoInput">Repo</label>
+          <input id="repoInput" class="input" type="text" placeholder="owner/name">
         </div>
-        <div>
-          <label class="field-label" for="limitInput">Limit</label>
-          <select id="limitInput">
+        <div class="filter-field">
+          <label for="limitInput">Limit</label>
+          <select id="limitInput" class="sel">
             <option value="25">25</option>
             <option value="50" selected>50</option>
             <option value="100">100</option>
@@ -387,14 +828,15 @@
             <option value="500">500</option>
           </select>
         </div>
-        <button id="applyFiltersButton" type="button">Apply</button>
+        <button id="applyFiltersButton" type="button" class="btn btn-secondary" style="align-self:flex-end">Apply</button>
       </div>
     </article>
 
-    <article class="jobs-card">
+    <!-- ── Jobs table ─────────────────────────────────────────── -->
+    <article class="card jobs-card">
       <div class="jobs-head">
         <span class="jobs-title">Recent jobs</span>
-        <span id="tableCount" class="jobs-count">0 jobs</span>
+        <span id="tableCount" class="jobs-count">—</span>
       </div>
       <div class="jobs-wrap">
         <table>
@@ -411,417 +853,601 @@
           <tbody id="jobsBody"></tbody>
         </table>
       </div>
-      <div id="emptyState" class="empty" hidden>No jobs match the current filters.</div>
+      <div id="emptyState" hidden>
+        <div class="empty-icon">⬜</div>
+        <div class="empty-title">No jobs</div>
+        <div class="empty-desc">No jobs match the current filters.</div>
+      </div>
     </article>
+
   </main>
+</div>
 
-  <script>
-    const tokenKey = "gharp.adminToken";
-    const refreshMs = 10000;
-    // Server-rendered so the JS path can mirror the server's
-    // authorization decision and avoid building disabled-looking
-    // controls that would still fire a request.
-    const allowAdminEdit = {{if .AllowAdminEdit}}true{{else}}false{{end}};
-    let refreshTimer = null;
-    let isLoading = false;
+<!-- ── Job detail drawer ─────────────────────────────────────── -->
+<div id="drawer" class="drawer" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="drawerJobName">
+  <div id="drawerBackdrop" class="drawer-backdrop"></div>
+  <div class="drawer-panel">
+    <div class="drawer-head">
+      <div class="drawer-head-info">
+        <div id="drawerJobName" class="drawer-job-name">Job detail</div>
+        <div id="drawerJobSub"  class="drawer-job-sub"></div>
+      </div>
+      <button id="drawerClose" class="drawer-close-btn" type="button" aria-label="Close drawer">✕</button>
+    </div>
+    <div id="drawerBody"></div>
+  </div>
+</div>
 
-    const el = {
-      adminButton: document.getElementById("adminButton"),
-      adminPanel: document.getElementById("adminPanel"),
-      authPanel: document.getElementById("authPanel"),
-      authForm: document.getElementById("authForm"),
-      tokenInput: document.getElementById("tokenInput"),
-      saveTokenButton: document.getElementById("saveTokenButton"),
-      clearTokenButton: document.getElementById("clearTokenButton"),
-      tokenButton: document.getElementById("tokenButton"),
-      refreshButton: document.getElementById("refreshButton"),
-      applyFiltersButton: document.getElementById("applyFiltersButton"),
-      clearStatusButton: document.getElementById("clearStatusButton"),
-      statusCheckboxes: document.querySelectorAll("input[name=status]"),
-      errorBanner: document.getElementById("errorBanner"),
-      lastUpdated: document.getElementById("lastUpdated"),
-      statPending: document.getElementById("statPending"),
-      statDispatched: document.getElementById("statDispatched"),
-      statInProgress: document.getElementById("statInProgress"),
-      statCompleted: document.getElementById("statCompleted"),
-      statActive: document.getElementById("statActive"),
-      statAvailable: document.getElementById("statAvailable"),
-      capacityNote: document.getElementById("capacityNote"),
-      capacityText: document.getElementById("capacityText"),
-      capacityFill: document.getElementById("capacityFill"),
-      repoInput: document.getElementById("repoInput"),
-      limitInput: document.getElementById("limitInput"),
-      jobsBody: document.getElementById("jobsBody"),
-      tableCount: document.getElementById("tableCount"),
-      emptyState: document.getElementById("emptyState")
-    };
+<script>
+  const tokenKey      = "gharp.adminToken";
+  const refreshMs     = 10000;
+  const allowAdminEdit = {{if .AllowAdminEdit}}true{{else}}false{{end}};
 
-    function getToken() {
-      return sessionStorage.getItem(tokenKey) || "";
+  let refreshTimer = null;
+  let isLoading    = false;
+  let firstLoad    = true;
+  let lastJobIds   = [];
+  let drawerJob    = null;
+
+  /* ── Element refs ─────────────────────────────────────────── */
+  const el = {
+    adminButton:       document.getElementById("adminButton"),
+    adminPanel:        document.getElementById("adminPanel"),
+    authPanel:         document.getElementById("authPanel"),
+    authForm:          document.getElementById("authForm"),
+    tokenInput:        document.getElementById("tokenInput"),
+    saveTokenButton:   document.getElementById("saveTokenButton"),
+    clearTokenButton:  document.getElementById("clearTokenButton"),
+    tokenButton:       document.getElementById("tokenButton"),
+    refreshButton:     document.getElementById("refreshButton"),
+    applyFiltersButton:document.getElementById("applyFiltersButton"),
+    clearStatusButton: document.getElementById("clearStatusButton"),
+    statusCheckboxes:  document.querySelectorAll("input[name=status]"),
+    errorBanner:       document.getElementById("errorBanner"),
+    lastUpdated:       document.getElementById("lastUpdated"),
+    liveDot:           document.getElementById("liveDot"),
+    statPending:       document.getElementById("statPending"),
+    statDispatched:    document.getElementById("statDispatched"),
+    statInProgress:    document.getElementById("statInProgress"),
+    statCompleted:     document.getElementById("statCompleted"),
+    statActive:        document.getElementById("statActive"),
+    statAvailable:     document.getElementById("statAvailable"),
+    capacityNote:      document.getElementById("capacityNote"),
+    capacityText:      document.getElementById("capacityText"),
+    capacityFill:      document.getElementById("capacityFill"),
+    repoInput:         document.getElementById("repoInput"),
+    limitInput:        document.getElementById("limitInput"),
+    jobsBody:          document.getElementById("jobsBody"),
+    tableCount:        document.getElementById("tableCount"),
+    emptyState:        document.getElementById("emptyState"),
+    drawer:            document.getElementById("drawer"),
+    drawerBackdrop:    document.getElementById("drawerBackdrop"),
+    drawerJobName:     document.getElementById("drawerJobName"),
+    drawerJobSub:      document.getElementById("drawerJobSub"),
+    drawerBody:        document.getElementById("drawerBody"),
+    drawerClose:       document.getElementById("drawerClose"),
+  };
+
+  /* ── Token helpers ────────────────────────────────────────── */
+  function getToken() { return sessionStorage.getItem(tokenKey) || ""; }
+  function setToken(t) {
+    if (t) sessionStorage.setItem(tokenKey, t);
+    else   sessionStorage.removeItem(tokenKey);
+  }
+
+  /* ── API ─────────────────────────────────────────────────── */
+  async function apiFetch(path, options = {}) {
+    const headers = new Headers(options.headers || {});
+    const token = getToken();
+    if (token) headers.set("Authorization", "Bearer " + token);
+    const res = await fetch(path, { ...options, headers });
+    if (res.status === 401) { showAuth(); throw new Error("ADMIN_TOKEN required"); }
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(body.trim() || res.statusText);
     }
+    const ct = res.headers.get("Content-Type") || "";
+    return ct.includes("application/json") ? res.json() : res.text();
+  }
 
-    function setToken(token) {
-      if (token) {
-        sessionStorage.setItem(tokenKey, token);
-      } else {
-        sessionStorage.removeItem(tokenKey);
+  /* ── UI helpers ───────────────────────────────────────────── */
+  function showAuth() {
+    el.authPanel.hidden = false;
+    el.tokenInput.value = getToken();
+    el.tokenInput.focus();
+  }
+  function showError(msg) {
+    el.errorBanner.textContent = msg;
+    el.errorBanner.hidden = !msg;
+  }
+  function buildJobsPath() {
+    const params = new URLSearchParams();
+    const checked = [...document.querySelectorAll("input[name=status]:checked")];
+    for (const c of checked) params.append("status", c.value);
+    const repo = el.repoInput.value.trim();
+    if (repo) params.set("repo", repo);
+    params.set("limit", el.limitInput.value || "50");
+    return "/jobs?" + params.toString();
+  }
+
+  /* ── Skeleton loader ──────────────────────────────────────── */
+  function showSkeletons(count) {
+    count = count || 5;
+    el.jobsBody.textContent = "";
+    const cols = allowAdminEdit ? 6 : 5;
+    const widths = ["42%", "70%", "55%", "62%", "48%", "38%"];
+    for (let i = 0; i < count; i++) {
+      const tr = document.createElement("tr");
+      tr.className = "skeleton-row";
+      for (let j = 0; j < cols; j++) {
+        const td = document.createElement("td");
+        const sk = document.createElement("div");
+        sk.className = "skeleton";
+        sk.style.width = widths[j % widths.length];
+        td.appendChild(sk);
+        tr.appendChild(td);
       }
+      el.jobsBody.appendChild(tr);
     }
+    el.tableCount.textContent = "Loading…";
+    el.emptyState.hidden = true;
+  }
 
-    async function apiFetch(path, options = {}) {
-      const headers = new Headers(options.headers || {});
-      const token = getToken();
-      if (token) {
-        headers.set("Authorization", "Bearer " + token);
-      }
-      const res = await fetch(path, { ...options, headers });
-      if (res.status === 401) {
-        showAuth();
-        throw new Error("ADMIN_TOKEN required");
-      }
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(body.trim() || res.statusText);
-      }
-      const contentType = res.headers.get("Content-Type") || "";
-      if (contentType.includes("application/json")) {
-        return await res.json();
-      }
-      return await res.text();
+  /* ── Refresh ──────────────────────────────────────────────── */
+  async function refresh() {
+    if (isLoading) return;
+    isLoading = true;
+    el.refreshButton.disabled = true;
+    showError("");
+    try {
+      const [stats, jobs] = await Promise.all([apiFetch("/stats"), apiFetch(buildJobsPath())]);
+      renderStats(stats);
+      renderJobs(jobs);
+      const now = new Date();
+      el.lastUpdated.textContent = "Updated " + now.toLocaleTimeString();
+      el.lastUpdated.title = now.toISOString();
+      el.liveDot.classList.add("live");
+    } catch (err) {
+      showError(err.message || "Request failed");
+    } finally {
+      isLoading = false;
+      el.refreshButton.disabled = false;
     }
+  }
 
-    function showAuth() {
-      el.authPanel.hidden = false;
-      el.tokenInput.value = getToken();
-      el.tokenInput.focus();
-    }
+  /* ── Stats ────────────────────────────────────────────────── */
+  function renderStats(stats) {
+    const jobs     = stats.jobs     || {};
+    const capacity = stats.capacity || {};
+    el.statPending.textContent    = jobs.pending     ?? 0;
+    el.statDispatched.textContent = jobs.dispatched  ?? 0;
+    el.statInProgress.textContent = jobs.in_progress ?? 0;
+    el.statCompleted.textContent  = jobs.completed   ?? 0;
+    el.statActive.textContent     = capacity.active_runners    ?? 0;
+    el.statAvailable.textContent  = capacity.available_slots   ?? 0;
 
-    function showError(message) {
-      el.errorBanner.textContent = message;
-      el.errorBanner.hidden = !message;
-    }
+    const max     = capacity.max_concurrent_runners || 0;
+    const active  = capacity.active_runners || 0;
+    const pct     = max > 0 ? Math.min(100, Math.round(active / max * 100)) : 0;
+    el.capacityText.textContent = active + " / " + max + " active";
+    el.capacityNote.textContent = max > 0 ? "Max " + max + " runners" : "Capacity unknown";
+    el.capacityFill.value = pct;
+    if (pct >= 100)      el.capacityFill.dataset.state = "full";
+    else if (pct >= 75)  el.capacityFill.dataset.state = "warn";
+    else                 delete el.capacityFill.dataset.state;
+  }
 
-    function buildJobsPath() {
-      const params = new URLSearchParams();
-      const statuses = [...document.querySelectorAll("input[name=status]:checked")].map(input => input.value);
-      for (const status of statuses) {
-        params.append("status", status);
+  /* ── Jobs ─────────────────────────────────────────────────── */
+  function renderJobs(data) {
+    const jobs   = data.jobs || [];
+    const newIds = jobs.map(j => String(j.id));
+
+    el.tableCount.textContent = jobs.length + (jobs.length === 1 ? " job" : " jobs");
+    el.emptyState.hidden      = jobs.length !== 0;
+
+    const sameIds = newIds.length === lastJobIds.length &&
+      newIds.every((id, i) => id === lastJobIds[i]);
+
+    if (sameIds && !firstLoad) {
+      // Incremental: update only badge and action cells to avoid layout shift
+      const rows = [...el.jobsBody.querySelectorAll("tr[data-job-id]")];
+      for (let i = 0; i < jobs.length; i++) {
+        const job = jobs[i];
+        const row = rows[i];
+        if (!row) continue;
+        const badge = row.querySelector(".badge");
+        if (badge) {
+          const cls  = "badge " + badgeClass(job);
+          const text = fmtLabel(job.conclusion || job.status || "—");
+          if (badge.className !== cls)  badge.className = cls;
+          if (badge.textContent !== text) badge.textContent = text;
+        }
+        if (allowAdminEdit) {
+          const ac = row.querySelector("[data-actions-cell]");
+          if (ac) ac.replaceWith(buildActionsCell(job));
+        }
       }
-      const repo = el.repoInput.value.trim();
-      if (repo) {
-        params.set("repo", repo);
-      }
-      params.set("limit", el.limitInput.value || "50");
-      return "/jobs?" + params.toString();
-    }
-
-    async function refresh() {
-      if (isLoading) {
-        return;
-      }
-      isLoading = true;
-      el.refreshButton.disabled = true;
-      showError("");
-      try {
-        const [stats, jobs] = await Promise.all([
-          apiFetch("/stats"),
-          apiFetch(buildJobsPath())
-        ]);
-        renderStats(stats);
-        renderJobs(jobs);
-        const now = new Date();
-        el.lastUpdated.textContent = "Updated " + now.toLocaleTimeString();
-        el.lastUpdated.title = now.toISOString();
-      } catch (err) {
-        showError(err.message || "Request failed");
-      } finally {
-        isLoading = false;
-        el.refreshButton.disabled = false;
-      }
-    }
-
-    function renderStats(stats) {
-      const jobs = stats.jobs || {};
-      const capacity = stats.capacity || {};
-      el.statPending.textContent = jobs.pending || 0;
-      el.statDispatched.textContent = jobs.dispatched || 0;
-      el.statInProgress.textContent = jobs.in_progress || 0;
-      el.statCompleted.textContent = jobs.completed || 0;
-      el.statActive.textContent = capacity.active_runners || 0;
-      el.statAvailable.textContent = capacity.available_slots || 0;
-
-      const max = capacity.max_concurrent_runners || 0;
-      const active = capacity.active_runners || 0;
-      const percent = max > 0 ? Math.min(100, Math.round((active / max) * 100)) : 0;
-      el.capacityText.textContent = active + " / " + max + " active";
-      el.capacityNote.textContent = max > 0 ? "Max " + max + " runners" : "Capacity unknown";
-      el.capacityFill.value = percent;
-      if (percent >= 100) {
-        el.capacityFill.dataset.state = "full";
-      } else if (percent >= 75) {
-        el.capacityFill.dataset.state = "warn";
-      } else {
-        delete el.capacityFill.dataset.state;
-      }
-    }
-
-    function renderJobs(data) {
-      const jobs = data.jobs || [];
+    } else {
+      // Full rebuild
       el.jobsBody.textContent = "";
-      el.tableCount.textContent = jobs.length + (jobs.length === 1 ? " job" : " jobs");
-      el.emptyState.hidden = jobs.length !== 0;
-
+      let prevOrg = null;
       for (const job of jobs) {
-        const row = document.createElement("tr");
-        // Actions column is hidden entirely when writes are disabled —
-        // mirrors the conditional <th>Actions</th> in the template so
-        // the column count matches.
-        const cells = allowAdminEdit
-          ? [actionsCell(job), cell(statusBadge(job)), repoCell(job), workflowCell(job), runnerCell(job), updatedCell(job.updated_at)]
-          : [cell(statusBadge(job)), repoCell(job), workflowCell(job), runnerCell(job), updatedCell(job.updated_at)];
-        row.append(...cells);
+        const org       = (job.repo || "").split("/")[0] || "";
+        const orgStart  = org !== prevOrg;
+        prevOrg         = org;
+        const row       = buildRow(job, orgStart, org);
+        row.dataset.jobId = String(job.id);
         el.jobsBody.appendChild(row);
       }
+      lastJobIds = newIds;
+      firstLoad  = false;
     }
+  }
 
-    // Two-line cell helper: primary text on top, muted secondary
-    // text (job name, run #, time of day, etc.) directly below.
-    function stackedCell(primary, secondary, options = {}) {
-      const td = document.createElement("td");
-      td.textContent = primary || "-";
-      if (options.title) {
-        td.title = options.title;
-      }
-      if (options.className) {
-        td.className = options.className;
-      }
-      if (secondary) {
-        const sub = document.createElement("div");
-        sub.className = "muted";
-        sub.textContent = secondary;
-        td.appendChild(sub);
-      }
-      return td;
+  /* ── Row builders ─────────────────────────────────────────── */
+  function buildRow(job, orgStart, org) {
+    const tr = document.createElement("tr");
+    const cells = allowAdminEdit
+      ? [buildActionsCell(job), badgeCell(job), repoCell(job, orgStart, org), workflowCell(job), runnerCell(job), updatedCell(job.updated_at)]
+      : [badgeCell(job), repoCell(job, orgStart, org), workflowCell(job), runnerCell(job), updatedCell(job.updated_at)];
+    tr.append(...cells);
+    // Click opens drawer (unless on a button)
+    tr.addEventListener("click", e => {
+      if (e.target.closest("button")) return;
+      openDrawer(job);
+    });
+    return tr;
+  }
+
+  function badgeClass(job) {
+    let cls = job.status || "";
+    if (job.conclusion && job.conclusion !== "success") cls += " bad";
+    return cls.trim();
+  }
+  function fmtLabel(v) { return String(v).replace(/_/g, " "); }
+
+  function badgeCell(job) {
+    const td = document.createElement("td");
+    const sp = document.createElement("span");
+    sp.className  = "badge " + badgeClass(job);
+    sp.textContent = fmtLabel(job.conclusion || job.status || "—");
+    td.appendChild(sp);
+    return td;
+  }
+
+  function repoCell(job, orgStart, org) {
+    const td = document.createElement("td");
+    td.className = "main-cell";
+    if (orgStart && org) {
+      const orgEl = document.createElement("div");
+      orgEl.className   = "cell-org";
+      orgEl.textContent = org;
+      td.appendChild(orgEl);
     }
-
-    function repoCell(job) {
-      return stackedCell(job.repo || "-", job.job_name || "", {
-        title: job.repo || "",
-        className: "main-cell"
-      });
-    }
-
-    function runnerCell(job) {
-      return stackedCell(job.runner_name || "-", runLabel(job), {
-        title: job.runner_name || ""
-      });
-    }
-
-    function updatedCell(value) {
-      const td = document.createElement("td");
-      if (!value) {
-        td.textContent = "-";
-        return td;
-      }
-      const date = new Date(value);
-      td.textContent = date.toLocaleDateString();
-      td.title = date.toISOString();
+    const primary = document.createElement("div");
+    primary.className   = "cell-primary";
+    primary.textContent = job.repo || "—";
+    td.appendChild(primary);
+    if (job.job_name) {
       const sub = document.createElement("div");
-      sub.className = "muted";
-      sub.textContent = date.toLocaleTimeString();
+      sub.className   = "cell-sub";
+      sub.textContent = job.job_name;
       td.appendChild(sub);
-      return td;
     }
+    return td;
+  }
 
-    function statusBadge(job) {
-      const span = document.createElement("span");
-      span.className = "badge " + (job.status || "");
-      if (job.conclusion && job.conclusion !== "success") {
-        span.classList.add("bad");
+  function workflowCell(job) {
+    return stackedCell(job.workflow_name || job.workflow || "—", job.labels || "");
+  }
+
+  function runnerCell(job) {
+    const primary = job.runner_name || "—";
+    const run     = job.run_id
+      ? "#" + job.run_id + (job.run_attempt ? " attempt " + job.run_attempt : "")
+      : "";
+    return stackedCell(primary, run, { mono: true });
+  }
+
+  function updatedCell(value) {
+    const td = document.createElement("td");
+    if (!value) { td.textContent = "—"; return td; }
+    const d = new Date(value);
+    td.textContent = d.toLocaleDateString();
+    td.title       = d.toISOString();
+    const sub = document.createElement("div");
+    sub.className   = "cell-sub";
+    sub.textContent = d.toLocaleTimeString();
+    td.appendChild(sub);
+    return td;
+  }
+
+  function stackedCell(primary, secondary, opts) {
+    opts = opts || {};
+    const td = document.createElement("td");
+    const p  = document.createElement("div");
+    p.className   = "cell-primary" + (opts.mono ? " mono" : "");
+    p.textContent = primary;
+    td.appendChild(p);
+    if (secondary) {
+      const s = document.createElement("div");
+      s.className   = "cell-sub";
+      s.textContent = secondary;
+      td.appendChild(s);
+    }
+    return td;
+  }
+
+  function buildActionsCell(job) {
+    const td   = document.createElement("td");
+    td.dataset.actionsCell = "true";
+    const wrap = document.createElement("div");
+    wrap.className = "row-actions";
+    if (job.status === "completed")
+      wrap.appendChild(actionBtn("Retry", "retry", job.id, "btn-secondary"));
+    if (job.status === "pending" || job.status === "dispatched")
+      wrap.appendChild(actionBtn("Cancel", "cancel", job.id, "btn-secondary"));
+    if (!wrap.children.length) {
+      wrap.className = "row-actions empty";
+      const sp = document.createElement("span");
+      sp.textContent = "—";
+      wrap.appendChild(sp);
+    }
+    td.appendChild(wrap);
+    return td;
+  }
+
+  function actionBtn(label, action, id, variant) {
+    const btn = document.createElement("button");
+    btn.type      = "button";
+    btn.className = "btn btn-sm " + (variant || "btn-secondary");
+    btn.textContent = label;
+    btn.addEventListener("click", async e => {
+      e.stopPropagation();
+      btn.disabled = true;
+      showError("");
+      try {
+        await apiFetch("/jobs/" + id + "/" + action, { method: "POST" });
+        await refresh();
+      } catch (err) {
+        showError(err.message || action + " failed");
+      } finally {
+        btn.disabled = false;
       }
-      span.textContent = formatBadgeLabel(job.conclusion || job.status || "-");
-      return span;
-    }
+    });
+    return btn;
+  }
 
-    function formatBadgeLabel(value) {
-      return String(value).replace(/_/g, " ");
-    }
+  /* ── Drawer ───────────────────────────────────────────────── */
+  const STATUS_ORDER = { pending: 0, dispatched: 1, in_progress: 2, completed: 3 };
 
-    function cell(child) {
-      const td = document.createElement("td");
-      td.appendChild(child);
-      return td;
-    }
+  function openDrawer(job) {
+    drawerJob = job;
 
-    function workflowCell(job) {
-      return stackedCell(job.workflow_name || "-", job.labels || "");
-    }
+    el.drawerJobName.textContent = job.job_name || ("Job #" + job.id);
+    el.drawerJobSub.textContent  = [
+      job.repo,
+      job.workflow_name || job.workflow,
+    ].filter(Boolean).join(" · ");
 
-    function runLabel(job) {
-      if (!job.run_id) {
-        return "";
+    el.drawerBody.innerHTML = "";
+
+    // Status
+    const statusSec = makeSec("Status");
+    const badge = document.createElement("span");
+    badge.className   = "badge " + badgeClass(job);
+    badge.textContent = fmtLabel(job.conclusion || job.status || "—");
+    statusSec.appendChild(badge);
+    el.drawerBody.appendChild(statusSec);
+
+    // Metadata
+    const metaSec = makeSec("Details");
+    const rows = [
+      job.runner_name ? ["Runner",  job.runner_name, true]  : null,
+      job.run_id      ? ["Run",     "#" + job.run_id, true]  : null,
+      job.run_attempt ? ["Attempt", "#" + job.run_attempt, true] : null,
+      job.labels      ? ["Labels",  job.labels, false]       : null,
+    ].filter(Boolean);
+    if (rows.length) {
+      const grid = document.createElement("div");
+      grid.className = "drawer-meta";
+      for (const [k, v, mono] of rows) {
+        const key = document.createElement("div");
+        key.className   = "drawer-meta-key";
+        key.textContent = k;
+        const val = document.createElement("div");
+        val.className   = "drawer-meta-val" + (mono ? " mono" : "");
+        val.textContent = v;
+        grid.appendChild(key);
+        grid.appendChild(val);
       }
-      const attempt = job.run_attempt ? " attempt " + job.run_attempt : "";
-      return "#" + job.run_id + attempt;
+      metaSec.appendChild(grid);
+    }
+    if (job.run_id && job.repo) {
+      const attempt = job.run_attempt || 1;
+      const a = document.createElement("a");
+      a.href     = "https://github.com/" + job.repo + "/actions/runs/" + job.run_id + "/attempts/" + attempt;
+      a.target   = "_blank";
+      a.rel      = "noopener noreferrer";
+      a.className= "drawer-gh-link";
+      a.textContent = "Open on GitHub →";
+      metaSec.appendChild(a);
+    }
+    el.drawerBody.appendChild(metaSec);
+
+    // Timeline
+    const tlSec = makeSec("Timeline");
+    const phases = [
+      { key: "pending",    label: "Pending",     desc: "Queued, awaiting runner" },
+      { key: "dispatched", label: "Dispatched",  desc: "Runner container starting" },
+      { key: "in_progress",label: "In progress", desc: "Executing on runner" },
+      { key: "completed",  label: "Completed",   desc: job.conclusion ? fmtLabel(job.conclusion) : "Finished" },
+    ];
+    const curIdx = STATUS_ORDER[job.status] ?? 0;
+    const tl = document.createElement("div");
+    tl.className = "timeline";
+    for (let i = 0; i < phases.length; i++) {
+      const ph = phases[i];
+      const item = document.createElement("div");
+      item.className = "tl-item";
+      const dot = document.createElement("div");
+      dot.className = "tl-dot";
+      if (i < curIdx)      dot.classList.add("done");
+      else if (i === curIdx) {
+        const failed = job.conclusion && job.conclusion !== "success";
+        dot.classList.add(failed ? "error" : "active");
+      }
+      const content = document.createElement("div");
+      const lbl = document.createElement("div");
+      lbl.className = "tl-label";
+      lbl.textContent = ph.label;
+      const desc = document.createElement("div");
+      desc.className = "tl-desc";
+      desc.textContent = (i === curIdx && job.updated_at)
+        ? new Date(job.updated_at).toLocaleString()
+        : ph.desc;
+      content.appendChild(lbl);
+      content.appendChild(desc);
+      item.appendChild(dot);
+      item.appendChild(content);
+      tl.appendChild(item);
+    }
+    tlSec.appendChild(tl);
+    el.drawerBody.appendChild(tlSec);
+
+    // Drawer actions
+    if (allowAdminEdit) {
+      const hasBtns = job.status === "completed" ||
+        job.status === "pending" || job.status === "dispatched";
+      if (hasBtns) {
+        const actSec = makeSec("Actions");
+        const wrap = document.createElement("div");
+        wrap.className = "drawer-actions";
+        if (job.status === "completed")
+          wrap.appendChild(actionBtn("Retry", "retry", job.id, "btn-secondary"));
+        if (job.status === "pending" || job.status === "dispatched")
+          wrap.appendChild(actionBtn("Cancel", "cancel", job.id, "btn-secondary"));
+        actSec.appendChild(wrap);
+        el.drawerBody.appendChild(actSec);
+      }
     }
 
-    function actionsCell(job) {
-      const td = document.createElement("td");
-      const wrap = document.createElement("div");
-      wrap.className = "row-actions";
-      if (job.status === "completed") {
-        wrap.appendChild(actionButton("Retry", "retry", job.id, "secondary outline"));
-      }
-      if (job.status === "pending" || job.status === "dispatched") {
-        wrap.appendChild(actionButton("Cancel", "cancel", job.id, ""));
-      }
-      if (!wrap.children.length) {
-        wrap.classList.add("empty");
-        const span = document.createElement("span");
-        span.className = "muted";
-        span.textContent = "-";
-        wrap.appendChild(span);
-      }
-      td.appendChild(wrap);
-      return td;
-    }
+    el.drawer.setAttribute("aria-hidden", "false");
+    el.drawerClose.focus();
+  }
 
-    function actionButton(label, action, id, variant) {
-      // Caller guarantees allowAdminEdit is true (renderJobs skips the
-      // actions cell entirely otherwise), so we don't need a disabled
-      // fallback path here. The column header is also conditionally
-      // omitted from the template, keeping the column count consistent.
-      const button = document.createElement("button");
-      button.type = "button";
-      if (variant) {
-        button.className = variant;
+  function closeDrawer() {
+    el.drawer.setAttribute("aria-hidden", "true");
+    drawerJob = null;
+  }
+
+  function makeSec(title) {
+    const sec = document.createElement("div");
+    const t   = document.createElement("div");
+    t.className   = "drawer-section-title";
+    t.textContent = title;
+    sec.appendChild(t);
+    return sec;
+  }
+
+  /* ── Polling ──────────────────────────────────────────────── */
+  function scheduleRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(refresh, refreshMs);
+  }
+
+  /* ── Filter helpers ───────────────────────────────────────── */
+  function syncClearBtn() {
+    el.clearStatusButton.disabled = ![...el.statusCheckboxes].some(b => b.checked);
+  }
+
+  /* ── Credential rotation forms ────────────────────────────── */
+  function wireRotateForm(formID, inputID) {
+    const form   = document.getElementById(formID);
+    if (!form) return;
+    const input  = document.getElementById(inputID);
+    const status = form.querySelector("[data-status]");
+    const btn    = form.querySelector("button[type=submit]");
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      if (!allowAdminEdit) return;
+      const value = input.value;
+      if (!value || !value.trim()) {
+        status.textContent = "Enter a value first";
+        status.className   = "admin-form-status err";
+        return;
       }
-      button.textContent = label;
-      button.addEventListener("click", async () => {
-        button.disabled = true;
-        showError("");
-        try {
-          await apiFetch("/jobs/" + id + "/" + action, { method: "POST" });
-          await refresh();
-        } catch (err) {
-          showError(err.message || action + " failed");
-        } finally {
-          button.disabled = false;
+      btn.disabled = true;
+      status.textContent = "Rotating…";
+      status.className   = "admin-form-status";
+      try {
+        const body = {};
+        body[form.dataset.field] = value;
+        const res = await apiFetch("/admin/app-config", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const fp = (res && res[form.dataset.field + "_fingerprint"]) || "";
+        if (Array.isArray(res.rotated) && res.rotated.length === 0) {
+          status.textContent = "No change (value matches current)";
+          status.className   = "admin-form-status";
+        } else {
+          status.textContent = "Rotated · " + fp;
+          status.className   = "admin-form-status ok";
+          input.value = "";
         }
-      });
-      return button;
-    }
-
-    function scheduleRefresh() {
-      if (refreshTimer) {
-        clearInterval(refreshTimer);
-      }
-      refreshTimer = setInterval(refresh, refreshMs);
-    }
-
-    function syncClearStatusButton() {
-      const anyChecked = [...el.statusCheckboxes].some(box => box.checked);
-      el.clearStatusButton.disabled = !anyChecked;
-    }
-
-    function saveTokenAndRefresh() {
-      setToken(el.tokenInput.value.trim());
-      el.authPanel.hidden = true;
-      refresh();
-    }
-
-    el.tokenButton.addEventListener("click", showAuth);
-    el.refreshButton.addEventListener("click", refresh);
-    el.adminButton.addEventListener("click", () => {
-      el.adminPanel.hidden = !el.adminPanel.hidden;
-    });
-    el.applyFiltersButton.addEventListener("click", refresh);
-    el.statusCheckboxes.forEach(box => box.addEventListener("change", () => {
-      syncClearStatusButton();
-      refresh();
-    }));
-    el.clearStatusButton.addEventListener("click", () => {
-      let changed = false;
-      el.statusCheckboxes.forEach(box => {
-        if (box.checked) {
-          box.checked = false;
-          changed = true;
-        }
-      });
-      syncClearStatusButton();
-      if (changed) {
-        refresh();
+      } catch (err) {
+        status.textContent = err.message || "rotate failed";
+        status.className   = "admin-form-status err";
+      } finally {
+        btn.disabled = !allowAdminEdit;
       }
     });
-    el.authForm.addEventListener("submit", event => {
-      event.preventDefault();
-      saveTokenAndRefresh();
-    });
-    el.clearTokenButton.addEventListener("click", () => {
-      setToken("");
-      el.tokenInput.value = "";
-      refresh();
-    });
-    el.repoInput.addEventListener("keydown", event => {
-      if (event.key === "Enter") {
-        refresh();
-      }
-    });
+  }
 
-    // Rotate-credentials forms. Each form submits one field — partial
-    // PATCH means an absent field is left untouched server-side, which
-    // matches the per-field "rotate this and only this" UX.
-    function wireRotateForm(formID, inputID) {
-      const form = document.getElementById(formID);
-      if (!form) return;
-      const input = document.getElementById(inputID);
-      const status = form.querySelector("[data-status]");
-      const button = form.querySelector("button[type=submit]");
-      form.addEventListener("submit", async event => {
-        event.preventDefault();
-        if (!allowAdminEdit) return;
-        const value = input.value;
-        if (!value || !value.trim()) {
-          status.textContent = "Enter a value first";
-          status.className = "status err";
-          return;
-        }
-        button.disabled = true;
-        status.textContent = "Rotating…";
-        status.className = "status";
-        try {
-          const body = {};
-          body[form.dataset.field] = value;
-          const res = await apiFetch("/admin/app-config", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          const fp = (res && res[form.dataset.field + "_fingerprint"]) || "";
-          if (Array.isArray(res.rotated) && res.rotated.length === 0) {
-            status.textContent = "No change (value matches current)";
-            status.className = "status";
-          } else {
-            status.textContent = "Rotated · " + fp;
-            status.className = "status ok";
-            input.value = "";
-          }
-        } catch (err) {
-          status.textContent = err.message || "rotate failed";
-          status.className = "status err";
-        } finally {
-          button.disabled = !allowAdminEdit;
-        }
-      });
-    }
-
-    wireRotateForm("rotateWebhookForm", "rotateWebhookInput");
-    wireRotateForm("rotatePEMForm", "rotatePEMInput");
-    wireRotateForm("rotateClientForm", "rotateClientInput");
-
-    syncClearStatusButton();
+  /* ── Event wiring ─────────────────────────────────────────── */
+  el.tokenButton.addEventListener("click", showAuth);
+  el.refreshButton.addEventListener("click", refresh);
+  el.adminButton.addEventListener("click", () => {
+    el.adminPanel.hidden = !el.adminPanel.hidden;
+  });
+  el.applyFiltersButton.addEventListener("click", refresh);
+  el.statusCheckboxes.forEach(box => box.addEventListener("change", () => {
+    syncClearBtn();
     refresh();
-    scheduleRefresh();
-  </script>
+  }));
+  el.clearStatusButton.addEventListener("click", () => {
+    let changed = false;
+    el.statusCheckboxes.forEach(box => { if (box.checked) { box.checked = false; changed = true; } });
+    syncClearBtn();
+    if (changed) refresh();
+  });
+  el.authForm.addEventListener("submit", e => {
+    e.preventDefault();
+    setToken(el.tokenInput.value.trim());
+    el.authPanel.hidden = true;
+    refresh();
+  });
+  el.clearTokenButton.addEventListener("click", () => {
+    setToken("");
+    el.tokenInput.value = "";
+    refresh();
+  });
+  el.repoInput.addEventListener("keydown", e => { if (e.key === "Enter") refresh(); });
+  el.drawerClose.addEventListener("click", closeDrawer);
+  el.drawerBackdrop.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+
+  wireRotateForm("rotateWebhookForm", "rotateWebhookInput");
+  wireRotateForm("rotatePEMForm",     "rotatePEMInput");
+  wireRotateForm("rotateClientForm",  "rotateClientInput");
+
+  /* ── Boot ─────────────────────────────────────────────────── */
+  syncClearBtn();
+  showSkeletons();
+  refresh();
+  scheduleRefresh();
+</script>
 </body>
 </html>

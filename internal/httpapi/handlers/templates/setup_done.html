@@ -5,44 +5,137 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>gharp · Ready</title>
   <link rel="icon" href="https://zany.sh/favicon.svg?emoji=🪉">
-  <link rel="stylesheet" href="/css/pico.green.min.css">
+  <link rel="stylesheet" href="/css/tokens.css">
   <style>
-    main.container { max-width: 720px; padding-block: 2rem; }
-    header.brand { margin-bottom: 1.5rem; }
-    header.brand h1 { margin: 0; font-size: 1.6rem; font-weight: 700; }
-    header.brand h1 small {
-      color: var(--pico-muted-color);
-      font-weight: 400;
-      font-size: 1rem;
-      margin-left: 0.5rem;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 15px; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--g-font);
+      background: var(--g-bg);
+      color: var(--g-text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
     }
-    .install-button { display: inline-block; }
+
+    .page {
+      width: 100%;
+      max-width: 600px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .brand-name { font-size: 1.3rem; font-weight: 700; color: var(--g-text); }
+    .brand-sub  { font-size: 0.9rem; color: var(--g-text-muted); }
+
+    .card {
+      background: var(--g-surface);
+      border: 1px solid var(--g-border);
+      border-radius: var(--g-radius-lg);
+      padding: 24px;
+    }
+
+    .ready-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--g-status-progress-bg);
+      border: 1px solid var(--g-status-progress-border);
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--g-status-progress-text);
+      margin-bottom: 16px;
+    }
+    .ready-badge::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--g-status-progress-dot);
+    }
+
+    .card p {
+      font-size: 0.9rem;
+      color: var(--g-text);
+      margin-bottom: 12px;
+    }
+
+    .notice {
+      background: var(--g-bg-subtle);
+      border: 1px solid var(--g-border);
+      border-radius: var(--g-radius);
+      padding: 12px 14px;
+      font-size: 0.82rem;
+      color: var(--g-text-muted);
+      margin-bottom: 20px;
+    }
+
+    .footer { margin-top: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 16px;
+      border-radius: var(--g-radius);
+      font-family: inherit;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.12s;
+      text-decoration: none;
+    }
+    .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.3); }
+    .btn-primary {
+      background: var(--g-btn-primary-bg);
+      color: var(--g-btn-primary-fg);
+      border-color: var(--g-btn-primary-border);
+    }
+    .btn-primary:hover { background: var(--g-btn-primary-hover-bg); }
+    .btn-secondary {
+      background: var(--g-btn-secondary-bg);
+      color: var(--g-btn-secondary-fg);
+      border-color: var(--g-btn-secondary-border);
+    }
+    .btn-secondary:hover { background: var(--g-btn-secondary-hover-bg); }
   </style>
 </head>
 <body>
-  <main class="container">
-    <header class="brand">
-      <h1>gharp <small>ready to install</small></h1>
-    </header>
+  <div class="page">
+    <div class="brand">
+      <span class="brand-name">gharp</span>
+      <span class="brand-sub">ready to install</span>
+    </div>
 
-    <article>
+    <div class="card">
+      <div class="ready-badge">App registered</div>
+
       <p>The GitHub App
          <strong><a target="_blank" rel="noopener" href="{{.SettingsURL}}">{{.Slug}}</a></strong>
-         has been registered. Now install it on the account/repos you want gharp
-         to serve.</p>
+         has been registered. Now install it on the account/repos you want gharp to serve.</p>
 
-      <small>
-        Tip: keep the auto-generated name. Renaming on GitHub changes the App
-        slug, which can break this install link (gharp itself keeps working —
-        only this shortcut becomes stale).
-      </small>
+      <div class="notice">
+        Tip: keep the auto-generated name. Renaming on GitHub changes the App slug,
+        which can break this install link (gharp itself keeps working — only this
+        shortcut becomes stale).
+      </div>
 
-      <footer>
-        <a class="install-button" role="button" href="{{.InstallURL}}">Install on GitHub</a>
-        &nbsp;
-        <a class="secondary outline" role="button" href="/">Open dashboard</a>
-      </footer>
-    </article>
-  </main>
+      <div class="footer">
+        <a class="btn btn-primary" href="{{.InstallURL}}">Install on GitHub</a>
+        <a class="btn btn-secondary" href="/">Open dashboard</a>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
