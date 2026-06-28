@@ -443,6 +443,12 @@ func (h *WebhookHandler) logError(msg string, err error) {
 	}
 }
 
+func (h *WebhookHandler) logInfo(msg string, args ...any) {
+	if h.Log != nil {
+		h.Log.Info(msg, args...)
+	}
+}
+
 // ---------------- workflow_run (Telegram notifications) ----------------
 
 type workflowRunEvent struct {
@@ -495,6 +501,11 @@ func (h *WebhookHandler) handleWorkflowRun(w http.ResponseWriter, r *http.Reques
 	if h.Telegram != nil {
 		if err := h.Telegram.SendMessage(r.Context(), settings.BotToken, settings.ChatID, buildRunMessage(&ev)); err != nil {
 			h.logError("send telegram notification", err)
+		} else {
+			h.logInfo("telegram notification sent",
+				"repo", ev.Repository.FullName,
+				"run", ev.WorkflowRun.RunNumber,
+				"conclusion", ev.WorkflowRun.Conclusion)
 		}
 	}
 	w.WriteHeader(http.StatusOK)
