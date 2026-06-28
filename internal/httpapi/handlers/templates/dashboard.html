@@ -271,6 +271,15 @@ body.loading .board{display:grid}
 .adm-block{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;margin-bottom:14px}
 .adm-block h5{margin:0 0 3px;font-size:13.5px;font-weight:700}
 .adm-block p{margin:0 0 11px;font-size:12px;color:var(--text-dim)}
+.nt-guide{margin:0 0 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-1);padding:8px 11px}
+.nt-guide summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--brand);user-select:none;list-style:none}
+.nt-guide summary::-webkit-details-marker{display:none}
+.nt-guide summary::before{content:"▸ ";color:var(--brand)}
+.nt-guide[open] summary::before{content:"▾ "}
+.nt-guide ol{margin:9px 0 2px;padding-left:18px;font-size:12px;color:var(--text-dim);line-height:1.6}
+.nt-guide li{margin:4px 0}
+.nt-guide code{font-size:11px;background:var(--surface-2);padding:1px 4px;border-radius:3px}
+.nt-guide .nt-note{margin:8px 0 0;font-size:11px;color:var(--text-dim);opacity:.85}
 .inrow{display:flex;flex-direction:column;gap:8px}
 .inrow label{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-faint)}
 .txt{height:38px;background:var(--surface);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--text);
@@ -542,6 +551,23 @@ body.loading .board{display:grid}
       <h5>Telegram alerts</h5>
       <p>Send a Telegram message when a workflow run finishes.</p>
 
+      <details class="nt-guide">
+        <summary>How to set this up</summary>
+        <ol>
+          <li><b>Create a bot.</b> In Telegram open <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> → send <code>/newbot</code> → pick a name and username. BotFather replies with a <b>token</b> like <code>123456:ABC-def...</code>.</li>
+          <li><b>Save the token.</b> Paste it into <b>Bot token</b> below and click <b>Save token</b>.</li>
+          <li><b>Pick where alerts go, then message the bot there:</b>
+            <ul>
+              <li><b>Direct messages</b> — open your new bot and tap <b>Start</b> (sends <code>/start</code>).</li>
+              <li><b>A group</b> — add the bot to the group, then send <code>/start@your_bot_username</code> <i>in that group</i>. (A bot can’t read normal group messages by default — send the command form so it sees it.)</li>
+            </ul>
+          </li>
+          <li><b>Click <span style="color:var(--brand)">Connect chat</span>.</b> It reads your most recent message to the bot and locks onto that chat. The status shows <code>connected: &lt;chat&gt;</code>.</li>
+          <li>Choose <b>Notify on</b> (all runs / failures only), tick <b>Enabled</b>, then <b>Send test</b> to confirm a message arrives.</li>
+        </ol>
+        <p class="nt-note">Order matters: send the message to the bot <i>before</i> clicking Connect. If it says “no messages found”, message the bot again and retry. Channels aren’t supported — use a direct chat or a group.</p>
+      </details>
+
       <div class="inrow">
         <label for="ntToken">Bot token</label>
         <input class="txt" id="ntToken" type="password" placeholder="123456:ABC-..." autocomplete="off">
@@ -553,7 +579,7 @@ body.loading .board{display:grid}
 
       <div class="ntRow">
         <button class="iconbtn" id="ntConnect" type="button"{{if not .AllowAdminEdit}} disabled{{end}} style="height:36px">Connect chat</button>
-        <span id="ntChatState" class="muted">Send <code>/start</code> to your bot, then click Connect.</span>
+        <span id="ntChatState" class="muted">Message the bot (or <code>/start@bot</code> in a group), then click Connect.</span>
       </div>
 
       <div class="inrow" style="margin-top:10px">

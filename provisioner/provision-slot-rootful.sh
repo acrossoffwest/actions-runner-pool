@@ -10,7 +10,8 @@
 # Usage: provision-slot-rootful.sh <slot-id> <uid>   (run as root)
 #
 # Env overrides: SLOTS_YAML, PUBLIC_HOST, PORTAL_GROUP, RUNNER_IMAGE,
-#                GHARP_MEM_MAX, GHARP_CPU_QUOTA, RUNNER_MEM, RUNNER_CPUS.
+#                GHARP_MEM_MAX, GHARP_CPU_QUOTA, RUNNER_MEM, RUNNER_CPUS,
+#                GHARP_MAX_RUNNERS (max concurrent runner containers; default 4).
 
 set -eu
 
@@ -42,6 +43,7 @@ GHARP_MEM_MAX="${GHARP_MEM_MAX:-4G}"
 GHARP_CPU_QUOTA="${GHARP_CPU_QUOTA:-200%}"
 RUNNER_MEM="${RUNNER_MEM:-2g}"
 RUNNER_CPUS="${RUNNER_CPUS:-1.0}"
+GHARP_MAX_RUNNERS="${GHARP_MAX_RUNNERS:-4}"
 
 echo ">>> Provisioning (rootful) slot ${SLOT_ID} — user ${OS_USER}, port ${PORT}"
 
@@ -49,8 +51,11 @@ echo ">>> Provisioning (rootful) slot ${SLOT_ID} — user ${OS_USER}, port ${POR
 if id "$OS_USER" >/dev/null 2>&1; then
     echo "[1/6] user $OS_USER exists"
 else
-    echo "[1/6] creating user $OS_USER"
-    useradd --system --no-create-home --home-dir "/home/${OS_USER}" \
+    echo "[1/6] creating user $OS_USER (uid ${UID_ARG})"
+    # Force the uid: the nftables egress chain below filters by skuid
+    # ${UID_ARG}, so the OS user MUST own exactly that uid or the
+    # cloud-metadata block would target the wrong account.
+    useradd --system --uid "$UID_ARG" --no-create-home --home-dir "/home/${OS_USER}" \
         --shell /usr/sbin/nologin "$OS_USER"
     mkdir -p "/home/${OS_USER}"; chown "${OS_USER}:${OS_USER}" "/home/${OS_USER}"
 fi
@@ -99,6 +104,12 @@ Environment=DOCKER_HOST=unix:///var/run/docker.sock
 Environment=BASE_URL=${SLOT_BASE_URL}
 Environment=GHARP_INSTANCE_ID=${SLOT_ID}
 Environment=ALLOW_PUBLIC_REPOS=false
+# Admin writes (retry/cancel/credential rotation/notifications) are enabled:
+# in the portal model each slot is owned by exactly one tenant and the portal
+# proxy enforces ownership + injects this instance's ADMIN_TOKEN as the bearer,
+# so "admin" here means the slot owner managing their own pool.
+Environment=ALLOW_ADMIN_EDIT=true
+Environment=MAX_CONCURRENT_RUNNERS=${GHARP_MAX_RUNNERS}
 Environment=PORT=${PORT}
 Environment=STORE_DSN=file:/home/${OS_USER}/gharp.db
 Environment=RUNNER_IMAGE=${RUNNER_IMAGE}
@@ -131,7 +142,7 @@ if ! grep -q "^  - id: ${SLOT_ID}$" "$SLOTS_YAML" 2>/dev/null; then
     internal_addr: 127.0.0.1:${PORT}
     cpu_limit: "${GHARP_CPU_QUOTA}"
     mem_limit: "${GHARP_MEM_MAX}"
-    max_runners: 4
+    max_runners: ${GHARP_MAX_RUNNERS}
     admin_token: ${ADMIN_TOKEN_VALUE}
 YAMLENTRY
 fi
