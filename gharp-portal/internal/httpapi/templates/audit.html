@@ -1,0 +1,98 @@
+{{define "audit"}}<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>gharp · Audit log</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪉</text></svg>">
+<script>(function(){try{var t=localStorage.getItem('gharp_theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="/static/tokens.css?v=2">
+<style>.filterbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap}</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <a class="brand" href="/admin">
+      <span class="logo" aria-hidden="true">🪉</span>
+      <h1>gharp <span class="sub">· Audit</span></h1>
+    </a>
+    <div class="spacer"></div>
+    <a class="iconbtn" href="/admin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Admin
+    </a>
+    <button class="themebtn" id="themeBtn" aria-label="Toggle theme">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+    </button>
+    <form method="post" action="/auth/logout" style="margin:0"><input type="hidden" name="_csrf" value="{{.CSRF}}">
+      <button class="iconbtn" type="submit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+        Sign out
+      </button>
+    </form>
+  </header>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Audit log <span class="ct">· {{len .Audit}} entries</span></h2>
+      <div class="spacer"></div>
+      <div class="filterbar">
+        <div class="field" title="Search actor / target / action">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--text-faint)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          <input id="q" placeholder="Filter actor / target / action" aria-label="Filter">
+        </div>
+      </div>
+    </div>
+    <div class="panel-body">
+      <table class="tbl" id="auditTable">
+        <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Target</th><th>Detail</th></tr></thead>
+        <tbody>
+          {{range .Audit}}
+          <tr>
+            <td data-l="Time" class="muted tnum">{{.At.Format "2006-01-02 15:04:05"}}</td>
+            <td data-l="Actor" class="lp">#{{.ActorID}}</td>
+            <td data-l="Action" class="lp">{{.Action}}</td>
+            <td data-l="Target" class="lp">{{.Target}}</td>
+            <td data-l="Detail" class="muted">{{.Detail}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="5" style="text-align:center;color:var(--text-faint);padding:26px">No audit entries.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+      <div class="empty" id="noResults" hidden style="text-align:center;color:var(--text-faint);padding:30px">
+        <div style="font-size:26px">🔍</div>
+        <h3 style="margin:8px 0 4px">No matching entries</h3>
+        <p>Nothing matches the current filter.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span class="safe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>Append-only audit trail</span>
+    <div class="spacer"></div>
+    <span>gharp portal · audit</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement, icon=document.getElementById('themeIcon');
+  function set(t){root.setAttribute('data-theme',t);localStorage.setItem('gharp_theme',t);
+    icon.innerHTML=t==='dark'?'<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';}
+  set(root.getAttribute('data-theme')||'dark');
+  document.getElementById('themeBtn').addEventListener('click',function(){set(root.getAttribute('data-theme')==='dark'?'light':'dark');});
+
+  var q=document.getElementById('q'),
+      rows=[].slice.call(document.querySelectorAll('#auditTable tbody tr')),
+      noRes=document.getElementById('noResults');
+  q.addEventListener('input',function(){
+    var term=q.value.trim().toLowerCase(), shown=0;
+    rows.forEach(function(r){ var ok=!term||r.textContent.toLowerCase().indexOf(term)>-1; r.hidden=!ok; if(ok)shown++; });
+    noRes.hidden=shown>0;
+  });
+})();
+</script>
+</body>
+</html>{{end}}

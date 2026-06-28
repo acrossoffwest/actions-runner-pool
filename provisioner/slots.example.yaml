@@ -1,0 +1,21 @@
+slots:
+  - id: slot-1
+    os_user: gharp-s1
+    uid: 1001
+    docker_host: unix:///run/user/1001/docker.sock
+    network: gharp-s1
+    base_url: https://s1.gharp.example.com
+    internal_addr: 127.0.0.1:9001
+    cpu_limit: "2.0"
+    mem_limit: "4g"
+    max_runners: 4
+  - id: slot-2
+    os_user: gharp-s2
+    uid: 1002
+    docker_host: unix:///run/user/1002/docker.sock
+    network: gharp-s2
+    base_url: https://s2.gharp.example.com
+    internal_addr: 127.0.0.1:9002
+    cpu_limit: "1.0"
+    mem_limit: "2g"
+    max_runners: 2

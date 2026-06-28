@@ -1,0 +1,213 @@
+{{define "admin"}}<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>gharp · Admin console</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪉</text></svg>">
+<script>/* pre-paint theme to avoid FOUC */(function(){try{var t=localStorage.getItem('gharp_theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="/static/tokens.css?v=2">
+<style>
+.meter{height:8px;border-radius:999px;background:var(--surface-3);border:1px solid var(--border);overflow:hidden;margin-top:10px}
+.meter>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--brand-2),var(--brand))}
+.runners-n{display:inline-flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
+.runners-n .rdot{width:6px;height:6px;border-radius:50%;background:var(--brand)}
+.slotpick{display:inline-flex;gap:6px;align-items:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <a class="brand" href="/admin">
+      <span class="logo" aria-hidden="true">🪉</span>
+      <h1>gharp <span class="sub">· Admin</span></h1>
+    </a>
+    <div class="spacer"></div>
+    <span class="userchip">{{.CurrentUser.Login}}<span class="rt">{{.CurrentUser.Role}}</span></span>
+    <button class="themebtn" id="themeBtn" aria-label="Toggle theme">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+    </button>
+    <a class="iconbtn" href="/app">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      My runner
+    </a>
+    <a class="iconbtn" href="/admin/audit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>
+      Audit
+    </a>
+    <form method="post" action="/auth/logout" style="margin:0"><input type="hidden" name="_csrf" value="{{.CSRF}}">
+      <button class="iconbtn" type="submit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+        Sign out
+      </button>
+    </form>
+  </header>
+
+  {{if .Flash}}<section class="ribbon" style="--rb-accent:var(--brand);--rb-soft:var(--brand-soft);--rb-bd:var(--s-run-bd)"><div class="glyph">✓</div><div class="rb-main"><div class="rb-state">{{.Flash}}</div></div></section>{{end}}
+  {{if .Error}}<section class="ribbon" style="--rb-accent:var(--danger);--rb-soft:var(--s-fail-bg);--rb-bd:var(--s-fail-bd)"><div class="glyph">!</div><div class="rb-main"><div class="rb-state">{{.Error}}</div></div></section>{{end}}
+
+  <section class="ribbon" {{if .Stats.InstancesError}}style="--rb-accent:var(--warn);--rb-soft:var(--s-fail-bg);--rb-bd:var(--s-fail-bd)"{{else}}style="--rb-accent:var(--brand);--rb-soft:var(--brand-soft);--rb-bd:var(--s-run-bd)"{{end}} aria-live="polite">
+    <div class="glyph">{{if .Stats.InstancesError}}!{{else}}✓{{end}}</div>
+    <div class="rb-main">
+      <div class="rb-state">{{if .Stats.InstancesError}}Attention — instance errors{{else}}Control plane healthy{{end}}</div>
+      <div class="rb-sub"><b>{{len .Users}}</b> users · <b>{{len .Slots}}</b> slots · <b>{{.Stats.InstancesRunning}}</b> running · <b>{{.Stats.InstancesError}}</b> errors</div>
+    </div>
+    <div class="pill-tags">
+      <span class="tag">Invite-only</span>
+      <span class="tag">Public repos blocked</span>
+    </div>
+  </section>
+
+  <section class="stats" aria-label="Overview">
+    <div class="tile">
+      <div class="lab"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>Users</div>
+      <div class="num tnum">{{len .Users}}</div>
+      <div class="hint">{{.Stats.UsersActive}} active · {{.Stats.UsersInvited}} invited · {{.Stats.UsersDisabled}} disabled</div>
+    </div>
+    <div class="tile hero">
+      <div class="lab"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/></svg>Slots</div>
+      <div class="num tnum">{{len .Slots}}</div>
+      <div class="hint">{{.Stats.SlotsAssigned}} assigned · {{.Stats.SlotsFree}} free · {{.Stats.SlotsDisabled}} disabled</div>
+      <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Stats.AssignedPct}}" aria-label="Slots assigned"><i style="width:{{.Stats.AssignedPct}}%"></i></div>
+    </div>
+    <div class="tile">
+      <div class="lab"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Access</div>
+      <div class="strbig">Invite-only</div>
+      <div class="hint">New users require an admin invite</div>
+    </div>
+    <div class="tile">
+      <div class="lab"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>Public repos</div>
+      <div class="strbig" style="color:var(--ok)">Blocked</div>
+      <div class="hint">Dropped server-side before dispatch</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Users <span class="ct">· {{len .Users}} total</span></h2>
+      <div class="spacer"></div>
+      <form class="inline-form" method="post" action="/admin/users">
+        <input type="hidden" name="_csrf" value="{{.CSRF}}">
+        <div class="field" title="GitHub login to invite">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--text-faint)" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          <input name="login" placeholder="github-login" aria-label="GitHub login" autocomplete="off" autocapitalize="none" required>
+        </div>
+        <select class="sel" name="role" aria-label="Role"><option value="user">user</option><option value="admin">admin</option></select>
+        <button class="iconbtn btn-primary sm" type="submit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Invite
+        </button>
+      </form>
+    </div>
+    <div class="panel-body">
+      <table class="tbl">
+        <thead><tr><th>Login</th><th>Role</th><th>Status</th><th>Slot</th><th>Gharp</th><th class="r">Actions</th></tr></thead>
+        <tbody>
+          {{range .Users}}{{$row := .}}
+          <tr>
+            <td data-l="Login" class="lp{{if eq .User.Status "disabled"}} muted{{end}}">{{.User.Login}}</td>
+            <td data-l="Role"><span class="rolechip{{if eq .User.Role "admin"}} admin{{end}}">{{.User.Role}}</span></td>
+            <td data-l="Status"><span class="badge s-{{.User.Status}}{{if eq .User.Status "invited"}} dotted{{end}}"><span class="sym"></span>{{.User.Status}}</span></td>
+            <td data-l="Slot" class="lp">{{if .Assignment}}{{.Assignment.SlotID}}{{else}}<span class="dash">—</span>{{end}}</td>
+            <td data-l="Gharp">{{if .Assignment}}<span class="badge s-{{.Assignment.GharpState}}{{if or (eq .Assignment.GharpState "running") (eq .Assignment.GharpState "starting")}} pulse{{end}}"><span class="sym"></span>{{.Assignment.GharpState}}</span>{{else}}<span class="dash">—</span>{{end}}</td>
+            <td class="actions"><div class="act-group">
+              <form method="post" action="/admin/users/{{.User.ID}}/assign"><input type="hidden" name="_csrf" value="{{$.CSRF}}">
+                <span class="slotpick"><select class="sel sm" name="slot_id" aria-label="Assign slot">
+                  {{if $row.Assignment}}<option value="{{$row.Assignment.SlotID}}">{{$row.Assignment.SlotID}}</option>{{else}}<option value="">slot…</option>{{end}}
+                  {{range $.Slots}}{{if eq .Slot.Status "free"}}<option value="{{.Slot.ID}}">{{.Slot.ID}} (free)</option>{{end}}{{end}}
+                </select>
+                <button class="iconbtn sm{{if not $row.Assignment}} btn-primary{{end}}" type="submit">{{if $row.Assignment}}Reassign{{else}}Assign slot{{end}}</button></span>
+              </form>
+              {{if eq .User.Status "disabled"}}
+              <form method="post" action="/admin/users/{{.User.ID}}/status"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><input type="hidden" name="status" value="active">
+                <button class="iconbtn sm" type="submit">Enable</button></form>
+              {{else}}
+              <form method="post" action="/admin/users/{{.User.ID}}/status"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><input type="hidden" name="status" value="disabled">
+                <button class="iconbtn sm btn-danger" type="submit">Disable</button></form>
+              {{end}}
+            </div></td>
+          </tr>
+          {{else}}
+          <tr><td colspan="6" style="text-align:center;color:var(--text-faint);padding:26px">No users yet — invite one above.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Slots <span class="ct">· {{len .Slots}}</span></h2>
+      <div class="spacer"></div>
+      <form method="post" action="/admin/slots/reload" style="margin:0"><input type="hidden" name="_csrf" value="{{.CSRF}}">
+        <button class="iconbtn sm" type="submit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+          Reload slots.yaml
+        </button>
+      </form>
+    </div>
+    <div class="panel-body">
+      <table class="tbl">
+        <thead><tr><th>ID</th><th>OS user</th><th>Status</th><th class="r">Runners</th><th>Assigned to</th></tr></thead>
+        <tbody>
+          {{range .Slots}}
+          <tr>
+            <td data-l="ID" class="lp{{if eq .Slot.Status "disabled"}} muted{{end}}">{{.Slot.ID}}</td>
+            <td data-l="OS user" class="lp muted">{{.Slot.OSUser}}</td>
+            <td data-l="Status"><span class="badge s-{{.Slot.Status}}"><span class="sym"></span>{{.Slot.Status}}</span></td>
+            <td data-l="Runners" class="r tnum">{{.Slot.MaxRunners}}</td>
+            <td data-l="Assigned to" class="lp">{{if .AssignedLogin}}{{.AssignedLogin}}{{else}}<span class="dash">free</span>{{end}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="5" style="text-align:center;color:var(--text-faint);padding:26px">No slots loaded — Reload slots.yaml.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Recent activity</h2>
+      <div class="spacer"></div>
+      <a class="iconbtn sm" href="/admin/audit">Full log →</a>
+    </div>
+    <div class="panel-body">
+      <table class="tbl">
+        <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Target</th><th>Detail</th></tr></thead>
+        <tbody>
+          {{range .Audit}}
+          <tr>
+            <td data-l="Time" class="muted tnum">{{.At.Format "15:04:05"}}</td>
+            <td data-l="Actor" class="lp">#{{.ActorID}}</td>
+            <td data-l="Action" class="lp">{{.Action}}</td>
+            <td data-l="Target" class="lp">{{.Target}}</td>
+            <td data-l="Detail" class="muted">{{.Detail}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="5" style="text-align:center;color:var(--text-faint);padding:26px">No activity yet.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span class="safe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>Invite-only · public repos blocked</span>
+    <div class="spacer"></div>
+    <span>gharp portal · control plane</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement, icon=document.getElementById('themeIcon');
+  function set(t){root.setAttribute('data-theme',t);localStorage.setItem('gharp_theme',t);
+    icon.innerHTML=t==='dark'?'<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';}
+  set(root.getAttribute('data-theme')||'dark');
+  document.getElementById('themeBtn').addEventListener('click',function(){set(root.getAttribute('data-theme')==='dark'?'light':'dark');});
+})();
+</script>
+</body>
+</html>{{end}}

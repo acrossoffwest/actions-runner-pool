@@ -1,0 +1,194 @@
+{{define "user"}}<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>gharp · My runner</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪉</text></svg>">
+<script>(function(){try{var t=localStorage.getItem('gharp_theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="/static/tokens.css?v=2">
+{{if and .Assignment (eq .Assignment.GharpState "starting")}}<meta http-equiv="refresh" content="5">{{end}}
+<style>
+html,body{height:100%}
+body{display:flex;flex-direction:column;overflow:hidden}
+.shell-top{display:flex;align-items:center;gap:14px;padding:10px clamp(14px,3vw,24px);border-bottom:1px solid var(--border);background:var(--surface);flex:none}
+.statusbar{display:flex;align-items:center;gap:12px;padding:9px clamp(14px,3vw,24px);border-bottom:1px solid var(--border);background:var(--surface-2);flex:none;flex-wrap:wrap}
+.statusbar .slotid{font-family:var(--mono);font-size:12.5px;color:var(--text-dim);background:var(--surface-3);border:1px solid var(--border);padding:3px 9px;border-radius:6px}
+.statusbar .lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)}
+.statusbar .spacer{flex:1}
+.statusbar .upd{font-size:12px;color:var(--text-faint)}
+.statusbar .msg{font-size:12.5px}.statusbar .msg.ok{color:var(--brand)}.statusbar .msg.err{color:var(--danger)}
+.statusbar form{margin:0}
+.stage{flex:1;position:relative;min-height:0;background:var(--bg);background-image:var(--bg-grad)}
+.stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--bg)}
+.statecard{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px}
+.statecard .inner{width:100%;max-width:430px;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-2);padding:34px 28px}
+.statecard .glyph{width:64px;height:64px;border-radius:17px;display:grid;place-items:center;margin:0 auto 18px;font-size:30px;background:var(--surface-2);border:1px solid var(--border)}
+.statecard.err .glyph{background:var(--s-fail-bg);border-color:var(--s-fail-bd)}
+.statecard h2{margin:0 0 8px;font-size:20px;font-weight:740;letter-spacing:-.02em}
+.statecard p{margin:0 auto 20px;color:var(--text-dim);font-size:14px;max-width:340px;text-wrap:pretty}
+.statecard .big{width:100%;height:48px;font-size:14.5px;justify-content:center}
+.spinner{width:22px;height:22px;border:3px solid var(--s-disp-bd);border-top-color:var(--s-disp-fg);border-radius:50%;animation:sp 1s linear infinite;margin:0 auto 18px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.statebar-actions{display:flex;gap:9px}
+.guide-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.guide-ov.open{display:flex}
+.guide{width:100%;max-width:560px;background:var(--surface);border:1px solid var(--border-2);border-radius:var(--r-lg);box-shadow:var(--shadow-pop);max-height:90vh;overflow:auto}
+.guide-h{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--border)}
+.guide-h h2{margin:0;font-size:16px;font-weight:700}
+.guide-b{padding:18px 20px}
+.guide ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:14px}
+.guide li{font-size:14px;color:var(--text-dim)}
+.guide li b{color:var(--text);font-weight:600}
+.guide code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 5px}
+.guide pre{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 13px;margin:8px 0 0;overflow:auto;color:var(--text)}
+.guide .cta{margin-top:10px}
+.guide .gnote{margin-top:16px;font-size:12.5px;color:var(--warn);display:flex;gap:8px;align-items:flex-start}
+.guide .gnote svg{width:15px;height:15px;flex:none;margin-top:1px}
+</style>
+</head>
+<body>
+  <header class="shell-top">
+    <a class="brand" href="/app">
+      <span class="logo" aria-hidden="true">🪉</span>
+      <h1>gharp <span class="sub">· My runner</span></h1>
+    </a>
+    <div class="spacer" style="flex:1"></div>
+    <span class="userchip">{{.CurrentUser.Login}}<span class="rt{{if ne .CurrentUser.Role "admin"}} user{{end}}">{{.CurrentUser.Role}}</span></span>
+    {{if eq .CurrentUser.Role "admin"}}<a class="iconbtn" href="/admin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
+      Admin
+    </a>{{end}}
+    <button class="themebtn" id="themeBtn" aria-label="Toggle theme">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+    </button>
+    <form method="post" action="/auth/logout" style="margin:0"><input type="hidden" name="_csrf" value="{{.CSRF}}">
+      <button class="iconbtn" type="submit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+        Sign out
+      </button>
+    </form>
+  </header>
+
+  <div class="statusbar">
+    <span class="lbl">Instance</span>
+    {{if .Assignment}}
+      <span class="badge s-{{.Assignment.GharpState}}{{if or (eq .Assignment.GharpState "running") (eq .Assignment.GharpState "starting")}} pulse{{end}}"><span class="sym"></span>{{.Assignment.GharpState}}</span>
+      <span class="slotid">{{.Assignment.SlotID}}</span>
+      <span class="spacer"></span>
+      {{if .Flash}}<span class="msg ok">{{.Flash}}</span>{{end}}{{if .Error}}<span class="msg err">{{.Error}}</span>{{end}}
+      <a class="iconbtn sm" href="/gh/{{.Assignment.SlotID}}/setup" target="_blank" rel="noopener" title="Create/manage the GitHub App for your runners">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Set up runners
+      </a>
+      <button class="iconbtn sm" type="button" id="guideBtn" title="How to connect a repository">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+        Guide
+      </button>
+      <div class="statebar-actions">
+        {{if eq .Assignment.GharpState "running"}}
+          <form method="post" action="/app/stop"><input type="hidden" name="_csrf" value="{{.CSRF}}"><button class="iconbtn sm btn-danger" type="submit"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Stop</button></form>
+        {{else if eq .Assignment.GharpState "stopped"}}
+          <form method="post" action="/app/start"><input type="hidden" name="_csrf" value="{{.CSRF}}"><button class="iconbtn sm btn-primary" type="submit"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start</button></form>
+        {{else if eq .Assignment.GharpState "error"}}
+          <form method="post" action="/app/stop"><input type="hidden" name="_csrf" value="{{.CSRF}}"><button class="iconbtn sm btn-danger" type="submit">Reset</button></form>
+        {{end}}
+      </div>
+    {{else}}
+      <span class="badge s-disabled"><span class="sym"></span>no slot</span>
+      <span class="spacer"></span>
+    {{end}}
+  </div>
+
+  <div class="stage">
+    {{if and .Assignment (eq .Assignment.GharpState "running")}}
+      <iframe id="frame" title="gharp dashboard" src="/app/" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+    {{else if not .Assignment}}
+      <div class="statecard">
+        <div class="inner">
+          <div class="glyph">🪉</div>
+          <h2>No slot assigned</h2>
+          <p>Your account is active but doesn't have a runner slot yet. An admin needs to assign one before you can start an instance.</p>
+        </div>
+      </div>
+    {{else if eq .Assignment.GharpState "stopped"}}
+      <div class="statecard">
+        <div class="inner">
+          <div class="glyph">🪉</div>
+          <h2>Instance stopped</h2>
+          <p>Slot <span class="mono">{{.Assignment.SlotID}}</span> is assigned to you. Start your gharp instance to begin accepting Actions jobs.</p>
+          <form method="post" action="/app/start"><input type="hidden" name="_csrf" value="{{.CSRF}}">
+            <button class="iconbtn btn-primary big" type="submit"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start instance</button>
+          </form>
+        </div>
+      </div>
+    {{else if eq .Assignment.GharpState "starting"}}
+      <div class="statecard start">
+        <div class="inner">
+          <div class="spinner"></div>
+          <h2>Starting…</h2>
+          <p>Spinning up your container on <span class="mono">{{.Assignment.SlotID}}</span>. This page refreshes automatically.</p>
+          <span class="badge s-starting pulse"><span class="sym"></span>starting</span>
+        </div>
+      </div>
+    {{else if eq .Assignment.GharpState "error"}}
+      <div class="statecard err">
+        <div class="inner">
+          <div class="glyph">⚠️</div>
+          <h2>Instance error</h2>
+          <p>Your gharp container on <span class="mono">{{.Assignment.SlotID}}</span> exited unexpectedly. Reset to recreate it, or contact an admin if it keeps failing.</p>
+          <form method="post" action="/app/stop"><input type="hidden" name="_csrf" value="{{.CSRF}}">
+            <button class="iconbtn btn-danger big" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Reset instance</button>
+          </form>
+        </div>
+      </div>
+    {{end}}
+  </div>
+
+{{if .Assignment}}
+<div class="guide-ov" id="guideOv" aria-hidden="true">
+  <div class="guide" role="dialog" aria-modal="true" aria-label="Connect a repository">
+    <div class="guide-h"><h2>🪉 Connect a repository</h2><button class="iconbtn sm" type="button" id="guideClose">Close</button></div>
+    <div class="guide-b">
+      <ol>
+        <li><b>Create your GitHub App.</b> Opens GitHub and registers an App scoped to your slot (its webhook points at your runner). gharp drives the flow — just confirm on GitHub.
+          <div class="cta"><a class="iconbtn btn-primary sm" href="/gh/{{.Assignment.SlotID}}/setup" target="_blank" rel="noopener">Open setup ↗</a></div>
+        </li>
+        <li><b>Install the App</b> on the repository (or whole org) you want runners for — gharp shows an “Install on GitHub” link after creation.</li>
+        <li><b>Point your workflow at the runners</b> — in <code>.github/workflows/&lt;name&gt;.yml</code>:
+          <pre>jobs:
+  build:
+    runs-on: [self-hosted]
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "hi from my gharp runner"</pre>
+        </li>
+        <li><b>Push or trigger the workflow.</b> The job shows up on this board (Queued → Running → Done); a fresh ephemeral runner spins up for each job.</li>
+      </ol>
+      <div class="gnote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg><span>Private repositories only — public repos are dropped before dispatch (fork-PR RCE guard).</span></div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+<script>
+(function(){
+  var root=document.documentElement, icon=document.getElementById('themeIcon');
+  function setT(t){root.setAttribute('data-theme',t);localStorage.setItem('gharp_theme',t);
+    icon.innerHTML=t==='dark'?'<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';}
+  setT(root.getAttribute('data-theme')||'dark');
+  document.getElementById('themeBtn').addEventListener('click',function(){setT(root.getAttribute('data-theme')==='dark'?'light':'dark');});
+
+  var gb=document.getElementById('guideBtn'), gov=document.getElementById('guideOv'), gc=document.getElementById('guideClose');
+  if(gb&&gov){
+    function open(){gov.classList.add('open');gov.setAttribute('aria-hidden','false');}
+    function close(){gov.classList.remove('open');gov.setAttribute('aria-hidden','true');}
+    gb.addEventListener('click',open);
+    if(gc)gc.addEventListener('click',close);
+    gov.addEventListener('click',function(e){if(e.target===gov)close();});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+  }
+})();
+</script>
+</body>
+</html>{{end}}

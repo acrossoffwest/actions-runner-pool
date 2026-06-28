@@ -1,0 +1,128 @@
+{{define "login"}}<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>gharp · Sign in</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪉</text></svg>">
+<style>
+:root{
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --r-sm:7px;--r-md:11px;--r-lg:16px;
+  --shadow-1:0 1px 2px rgba(0,0,0,.35);--shadow-2:0 8px 24px -8px rgba(0,0,0,.55),0 2px 6px rgba(0,0,0,.35);
+  --ring:0 0 0 3px var(--brand-a30);
+}
+[data-theme="dark"]{
+  --bg:#0a0d12;--bg-grad:radial-gradient(1200px 600px at 78% -8%,#11331f12,transparent 60%),radial-gradient(900px 500px at 0% 0%,#15203612,transparent 55%);
+  --surface:#11151c;--surface-2:#161b24;--hover:#1f2632;
+  --border:#242c38;--border-2:#2e3744;--text:#e9eef5;--text-dim:#9aa6b4;--text-faint:#677081;
+  --brand:#3fb950;--brand-2:#2ea043;--brand-ink:#04130a;--brand-a30:#3fb95040;--brand-soft:#132a1b;
+  --s-fail-fg:#f5a05a;--s-fail-bg:#2c1c10;--s-fail-bd:#5a3a1c;color-scheme:dark;
+}
+[data-theme="light"]{
+  --bg:#f4f6f9;--bg-grad:radial-gradient(1100px 560px at 80% -10%,#2ea04314,transparent 60%),radial-gradient(800px 460px at 0% 0%,#2b62ff0e,transparent 55%);
+  --surface:#fff;--surface-2:#f7f9fc;--hover:#eef2f7;
+  --border:#e2e7ee;--border-2:#d3dae3;--text:#0f1722;--text-dim:#5a6675;--text-faint:#8b97a6;
+  --brand:#1a7f37;--brand-2:#176c2f;--brand-ink:#fff;--brand-a30:#1a7f3733;--brand-soft:#e7f4ec;
+  --s-fail-fg:#b5571a;--s-fail-bg:#fbeede;--s-fail-bd:#f0d4b4;color-scheme:light;
+}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);background-image:var(--bg-grad);background-attachment:fixed;
+  color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5;letter-spacing:-.01em;min-height:100dvh;
+  display:flex;flex-direction:column}
+button{font-family:inherit;cursor:pointer}a{color:inherit}
+::selection{background:var(--brand-a30)}
+
+.bar{display:flex;align-items:center;gap:11px;padding:18px clamp(16px,4vw,32px)}
+.bar .logo{font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))}
+.bar h1{font-size:17px;font-weight:700;margin:0;letter-spacing:-.02em}
+.bar .sub{color:var(--text-faint);font-size:13px;font-weight:500}
+.bar .spacer{flex:1}
+.themebtn{width:38px;height:38px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--border);color:var(--text);display:grid;place-items:center}
+.themebtn svg{width:16px;height:16px}
+
+.center{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 20px 64px}
+.box{width:100%;max-width:404px}
+
+.mark{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:22px}
+.mark .glyph{width:60px;height:60px;border-radius:17px;background:var(--brand-soft);border:1px solid var(--brand-a30);
+  display:grid;place-items:center;font-size:30px;margin-bottom:16px;box-shadow:var(--shadow-1)}
+.mark h2{font-size:23px;font-weight:760;letter-spacing:-.03em;margin:0 0 6px}
+.mark p{color:var(--text-dim);font-size:14px;margin:0;max-width:320px}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-2);padding:22px}
+
+.err{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--s-fail-fg);background:var(--s-fail-bg);
+  border:1px solid var(--s-fail-bd);border-radius:var(--r-sm);padding:9px 11px;margin-bottom:14px}
+.err svg{width:15px;height:15px;flex:none}
+
+.btn{width:100%;display:inline-flex;align-items:center;justify-content:center;gap:9px;height:46px;border-radius:var(--r-sm);
+  font-size:14px;font-weight:650;border:1px solid transparent;background:var(--brand);color:var(--brand-ink);transition:.15s;text-decoration:none}
+.btn:hover{background:var(--brand-2)}
+.btn svg{width:18px;height:18px}
+
+.note{display:flex;gap:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:12px 14px;font-size:12.5px;color:var(--text-dim);margin-top:16px}
+.note svg{width:16px;height:16px;flex:none;color:var(--brand);margin-top:1px}
+.note b{color:var(--text);font-weight:600}
+
+.foot{text-align:center;color:var(--text-faint);font-size:12px;margin-top:20px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+  <header class="bar">
+    <span class="logo">🪉</span>
+    <div><h1>gharp <span class="sub">· Runner Pool</span></h1></div>
+    <div class="spacer"></div>
+    <button class="themebtn" id="themeBtn" type="button" aria-label="Toggle theme">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+    </button>
+  </header>
+
+  <main class="center">
+    <div class="box">
+      <div class="mark">
+        <div class="glyph">🪉</div>
+        <h2>Sign in to gharp</h2>
+        <p>Multi-tenant GitHub Actions runner portal. Sign in with GitHub to manage your runners.</p>
+      </div>
+
+      <div class="card">
+        {{if .Error}}
+        <div class="err" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+          <span>{{.Error}}</span>
+        </div>
+        {{end}}
+
+        <a class="btn" href="/auth/start">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          Sign in with GitHub
+        </a>
+
+        <div class="note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <span>Access is <b>by invitation only</b>. An admin must add your GitHub login before you can sign in.</span>
+        </div>
+      </div>
+
+      <p class="foot">🪉 gharp · GitHub Actions Runner Pool</p>
+    </div>
+  </main>
+
+<script>
+(function(){
+  var root=document.documentElement, icon=document.getElementById('themeIcon');
+  function setTheme(t){ root.dataset.theme=t; try{localStorage.setItem('gharp_theme',t);}catch(e){}
+    icon.innerHTML = t==='dark'
+      ? '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>'
+      : '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'; }
+  var saved; try{saved=localStorage.getItem('gharp_theme');}catch(e){}
+  setTheme(saved||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'));
+  document.getElementById('themeBtn').addEventListener('click',function(){ setTheme(root.dataset.theme==='dark'?'light':'dark'); });
+})();
+</script>
+</body>
+</html>{{end}}

@@ -1,172 +1,177 @@
-# 🪉 gharp — GitHub Actions Runner Pool
+# gharp-portal 🪉
 
-A self-hosted, Docker-based pool of ephemeral GitHub Actions runners.
+**A self-hosted, multi-tenant control plane for GitHub Actions runner pools.**
 
-> 🍴 **Dogfooded** — this repo's own CI was running on a gharp pool during development!
+Put one server in front of [gharp](https://github.com/muhac/actions-runner-pool)
+(an ephemeral, autoscaling self-hosted runner pool) and let *several people* —
+each with their own GitHub account, App, and repositories — run their own
+isolated runners on it. Admin invites users; each user signs in with GitHub, gets
+their own kernel-isolated sandbox running their own gharp instance, and sees only
+their own runners and jobs.
 
-## ✨ Features
+> gharp on its own is **single-tenant**: one GitHub App, one dashboard, no login.
+> gharp-portal makes it **multi-user, isolated, and self-service** — ideal for two
+> friends, a small team, or anyone hosting runners for multiple accounts/orgs on
+> one box.
 
-* 🔐 **Self-hosted** — no external service dependency
-* ♻️ **Ephemeral runners** — one job per runner, clean environment every time
-* ⚡ **Autoscaling** — runners are created on-demand from webhook events
-* 📊 **Built-in dashboard** — inspect jobs and runners (with prometheus metrics), retry/cancel controls, and in-place credential rotation (webhook secret / pem / client secret) gated behind a `ALLOW_ADMIN_EDIT` kill-switch
-* 📦 **Multi-repository, personal-account support** — share compute across repos (not supported natively by GitHub)
+---
 
-> 👉 **[Try the dashboard live](https://muhac.github.io/actions-runner-pool/demo/)** — same UI, mock data, no backend. Click Cancel / Retry to see how the dashboard reacts.
+## Why
 
-## 🚀 Quick Start
+Self-hosted GitHub Actions runners are great, but:
 
-### 1. Run gharp
+- A raw runner (or a single gharp) serves **one** GitHub App / account.
+- Running several people's runners on one server means either trusting them with
+  each other's secrets, or standing up a VM per person.
+- There's no login, no per-user view, no "give my friend their own runners"
+  button.
 
-Pre-built multi-arch image: [`muhac/gharp`](https://hub.docker.com/r/muhac/gharp).
+gharp-portal fixes that: **one server, many tenants, real isolation, a UI.**
 
-**Minimal `docker run`**
+## What you get
+
+- 🔑 **GitHub OAuth login** + roles (`admin` / `user`), invite-only.
+- 🧑‍💼 **Admin console** — invite users, assign each an isolated slot, watch
+  instance health, audit log.
+- 📦 **Per-user isolated slot** — its own OS user, Docker network, cgroup
+  CPU/memory caps, and nftables egress firewall (blocks cloud metadata).
+- 🪞 **Each user sees only their own runners** — the portal reverse-proxies each
+  user to *their* gharp dashboard; one user's GitHub App keys never touch
+  another's instance or the portal DB.
+- ▶️ **Start/stop your instance** from the UI; in-product **"Connect a repo"
+  guide**.
+- 🛡️ **Public-repo guard on by default** (fork-PR RCE protection); ephemeral
+  runners (one job → fresh container).
+- 🎨 Polished dark/light UI shared across every page.
+
+## Architecture
+
+```
+                      ┌────────────────────────────────────────────┐
+   admin ────────────▶│  PORTAL  (Go, unprivileged)  :8091          │
+   users ── OAuth ───▶│  • GitHub OAuth login + sessions + CSRF     │
+                      │  • roles, invite-only allowlist             │
+                      │  • admin: users + slot assignment + audit   │
+                      │  • lifecycle: start/stop a user's gharp     │
+                      │  • reverse proxy  /app/*  → user's gharp     │
+                      └───────┬──────────────────────┬──────────────┘
+        assign + proxy        │                      │
+        ┌─────────────────────┘                      └──────────────────┐
+   SLOT 1  (OS user, Docker net, cgroup caps,    SLOT 2  (…)
+            nftables egress)
+   ┌──────────────────────────────────┐          ┌──────────────────────────────┐
+   │ gharp (user A) :9001              │          │ gharp (user B) :9002          │
+   │   own GitHub App + own runners    │          │   own GitHub App + runners    │
+   │   ephemeral runner containers     │          │   …                           │
+   └──────────────────────────────────┘          └──────────────────────────────┘
+        ▲ GitHub webhooks (workflow_job) hit each gharp directly via
+          https://<host>/gh/slot-N/  (nginx strips the prefix)
+```
+
+- The **portal** is the only thing users log into. It never holds runner-App
+  private keys and never runs privileged operations.
+- Each **slot** is pre-provisioned once by an operator script; the portal just
+  assigns a free slot to a user and starts/stops their gharp via a single
+  allow-listed `sudo` wrapper.
+- **TLS** is terminated by a reverse proxy / CDN (e.g. Cloudflare); the origin
+  speaks plain HTTP behind nginx.
+
+## How a user goes live
+
+1. **Admin** signs in (bootstrap admin via `BOOTSTRAP_ADMIN_LOGIN`), invites a
+   GitHub login, assigns them a free slot.
+2. **User** signs in with GitHub → lands on `/app` → **Start** their instance.
+3. User clicks **Set up runners** → creates a GitHub App (gharp drives the
+   manifest flow) → installs it on their repos/org.
+4. In a workflow: `runs-on: [self-hosted]`. Push → a fresh ephemeral runner spins
+   up in the user's slot, runs the job, and is destroyed.
+
+## Repository layout
+
+This repository is a monorepo: the **gharp runner pool** at the root (the engine
+that runs inside each slot) plus the **portal** and its provisioner.
+
+```
+cmd/gharp/  internal/  docs/   # gharp — the ephemeral runner pool (runs in each slot)
+gharp-portal/            # the multi-tenant portal (Go, stdlib + net/http + html/template + sqlite)
+  cmd/portal/            #   entrypoint
+  internal/
+    config/  store/      #   config + SQLite (users, slots, assignments, sessions, audit)
+    auth/                #   GitHub OAuth, sessions, CSRF, RBAC
+    slots/               #   slots.yaml registry + assignment
+    lifecycle/  proxy/   #   start/stop a user's gharp + reverse proxy
+    httpapi/             #   router, handlers, templates, design tokens
+    wiring/              #   composition root (adapters + auth→proxy context bridge)
+provisioner/             # operator scripts that create kernel-isolated slots
+  provision-slot.sh      #   rootless-Docker slots (LTS kernels)
+  provision-slot-rootful.sh  # shared rootful-Docker slots (bleeding-edge kernels)
+  host/                  #   gharp-svc wrapper + sudoers
+docs/specs/              # portal design spec
+```
+
+## Deploy (quick start)
+
+**Prereqs on the host:** Linux, Docker, nginx (or any reverse proxy), a domain
+behind TLS (Cloudflare "Flexible" works), and a GitHub OAuth App for the portal.
 
 ```bash
-docker run -d --name gharp \
-  -p 8080:8080 \
-  -e BASE_URL=https://gharp.example.com \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v gharp-data:/data \
-  muhac/gharp:1
+# 1. Build the portal (cgo-free, static)
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o gharp-portal ./gharp-portal/cmd/portal
+
+# 2. Configure (env file, mode 600, root-owned)
+cat >/etc/gharp-portal.env <<'ENV'
+BASE_URL=https://runners.example.com
+PORT=8091
+BIND_ADDR=127.0.0.1                 # behind the reverse proxy
+STORE_DSN=file:/var/lib/gharp-portal/portal.db
+SLOTS_CONFIG=/var/lib/gharp-portal/slots.yaml
+SESSION_TTL=7d
+BOOTSTRAP_ADMIN_LOGIN=your-github-login
+PORTAL_OAUTH_CLIENT_ID=...           # GitHub OAuth App (callback: $BASE_URL/auth/callback)
+PORTAL_OAUTH_CLIENT_SECRET=...
+ENV
+
+# 3. Run it (systemd unit + nginx reverse proxy on :80 → 127.0.0.1:8091).
+#    4. Provision slots (operator, root):
+sudo SLOTS_YAML=/var/lib/gharp-portal/slots.yaml PUBLIC_HOST=runners.example.com \
+  provisioner/provision-slot-rootful.sh slot-1 5001
+#    add the nginx /gh/slot-1/ route, then POST /admin/slots/reload (or restart).
 ```
 
-`BASE_URL` must be a public HTTPS URL GitHub can reach, terminating at
-the container's port 8080 (above mapped to the host's 8080). See
-[`docs/configuration.md`](docs/configuration.md) for the full env-var reference.
+See [`docs/specs/`](docs/specs/) for the full design and
+[`provisioner/`](provisioner/) for slot provisioning details (rootless vs.
+rootful, isolation knobs, host prep).
 
-**Recommended — Docker Compose**
+## Security model
 
-```bash
-# copy docker-compose.yml from this repo, then:
-BASE_URL=https://gharp.example.com docker compose up -d
-```
+- **Web process is unprivileged.** Slot provisioning is operator-only; the portal
+  can only start/stop slot units through one validated, allow-listed `sudo`
+  helper.
+- **Per-tenant secret separation.** A user's runner GitHub App private key lives
+  only inside their slot's gharp — never in the portal DB or another slot.
+- **Per-slot kernel isolation.** Dedicated OS user + Docker network + cgroup caps
+  + nftables egress (cloud-metadata blocked). For an *untrusted* boundary use an
+  LTS kernel + rootless Docker (`provision-slot.sh`); the rootful-shared model
+  (`provision-slot-rootful.sh`) suits mutually-trusted tenants.
+- **Public repos blocked** by default in every slot (`ALLOW_PUBLIC_REPOS=false`),
+  closing the fork-PR RCE hole that makes self-hosted runners dangerous on public
+  repos.
+- Sessions are `HttpOnly; Secure; SameSite`; all mutations are CSRF-protected;
+  the reverse proxy enforces slot ownership and injects the gharp token
+  server-side.
 
-See [`docker-compose.yml`](docker-compose.yml) for the full reference configuration
-(workdir cleanup, host Docker socket forwarding for ephemeral runners,
-runner-container log caps, and `ADMIN_TOKEN` passthrough — set the
-token in `.env`).
+## Tech
 
-### 2. Create the GitHub App
+Go standard library only (no web framework), `html/template` + vanilla JS, pure-Go
+SQLite (`modernc.org/sqlite`) — ships as a single static binary with templates and
+CSS embedded.
 
-Open `${BASE_URL}/setup` and click **Create GitHub App**. gharp drives
-the GitHub App Manifest flow and persists the credentials locally.
+## Status
 
-> ⚠️ **Don't rename the auto-generated App name on GitHub.**
-> gharp creates the App as `gharp-<hash>`; renaming it changes the slug,
-> which breaks the install link gharp renders on `/setup`.
-> The webhook keeps working — only the install link goes stale.
-> To fix, delete the App on GitHub and re-run `/setup`.
+Built and running in production. Authentication, proxying, slot isolation, and the
+provisioner were cross-provider security-reviewed. Contributions welcome.
 
-> ⚠️ **`BASE_URL` is sticky.** It's baked into the GitHub App's webhook
-> and OAuth-callback URLs at `/setup` time. Changing it later won't
-> reconfigure the App — gharp will log a `BASE_URL drift` warning at
-> startup. To migrate, re-run `/setup` (creating a fresh App) or revert
-> `BASE_URL` to the original value.
+## License
 
-### 3. Install the App
-
-Pick the repos (or "All repositories") you want runners for and submit.
-
-> ⚠️ **Self-hosted runners + public repos = remote code execution.**
-> GitHub [explicitly recommends against](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/add-runners)
-> using self-hosted runners with public repositories: any contributor
-> who can open a PR can run arbitrary code on your machine.
-> Only install the App on **private** repos you trust,
-> and run gharp on a **dedicated VM / cloud instance / homelab node**.
-> gharp drops public-repo `workflow_job` webhooks by default. To opt in,
-> set `ALLOW_PUBLIC_REPOS=true` for all public repos, or use
-> `REPO_ALLOWLIST=owner/repo` to bypass the guard for selected public repos.
-
-### 4. Add a workflow
-
-```yaml
-jobs:
-  build:
-    runs-on:
-      - self-hosted
-    steps:
-      - uses: actions/checkout@v4
-      - run: echo "hello from $(hostname)"
-
-  test:
-    runs-on:
-      - self-hosted
-      - "gharp-test-${{ github.run_id }}-${{ github.run_attempt }}"
-    steps:
-      - run: echo "tests from $(hostname)"
-```
-
-Every `workflow_job` whose `runs-on` set is fully covered by
-`RUNNER_LABELS` (default `self-hosted`; `self-hosted` is implicit on
-every self-hosted runner so you don't need to list it) or a configured
-dynamic label prefix (default `gharp-`) will get a fresh runner. Jobs
-requiring a label this pool doesn't advertise are dropped — see
-[`docs/configuration.md`](docs/configuration.md).
-
-For the full deployment guide (from-source build, docker compose,
-volumes, upgrades, ops APIs, troubleshooting), see [`docs/deploy.md`](docs/deploy.md).
-
-## 🤔 Why?
-
-GitHub does **not support "user-level" runners**.
-
-* Runners are scoped to: repository, organization, or enterprise
-
-This makes it hard to:
-
-* share a runner across multiple repositories
-* use self-hosted runners efficiently in personal accounts
-* scale runners dynamically
-
-💡 **This project solves that**
-
-* Uses **GitHub App + webhook (`workflow_job`)**
-* Dynamically creates **ephemeral runners per job**
-* Automatically cleans up after execution
-
-👉 You get **GitHub-hosted-like behavior on your own machine**
-
-## 🏗️ Architecture
-
-```mermaid
-flowchart TB
-    subgraph setup["One-time setup"]
-        direction LR
-        U[User] -- POST manifest --> GH1[GitHub]
-        GH1 -- code + slug --> G1[gharp]
-        G1 -- App credentials --> DB[(sqlite)]
-        U -- install App --> GH1
-    end
-
-    subgraph runtime["Per-job runtime"]
-        direction LR
-        GH2[GitHub] -- workflow_job webhook --> G2[gharp]
-        G2 -- record job --> DB2[(sqlite)]
-        G2 -- registration token --> GH2
-        G2 -- docker run --> R[ephemeral runner]
-        R -- runs the job --> GH2
-        R -- one job, then exit --> X((removed))
-    end
-
-    setup --> runtime
-```
-
-See [`docs/architecture.md`](docs/architecture.md) for the full design,
-including the GitHub App Manifest flow, sqlite job durability, and
-permission scopes.
-
-## 📦 Tech Stack
-
-* Go (server)
-* Docker (runner execution)
-* GitHub App (auth + webhook)
-
-## 📄 License
-
-[Apache License 2.0](LICENSE) — Copyright 2026 Muhan Li.
-
-## 🙌 Acknowledgements
-
-* [GitHub Actions](https://docs.github.com/en/actions) / [self-hosted runners](https://docs.github.com/en/actions/concepts/runners/self-hosted-runners)
-* [Docker Github Actions Runner](https://github.com/myoung34/docker-github-actions-runner)
+The portal is provided as-is; the vendored gharp keeps its own (Apache-2.0)
+license.

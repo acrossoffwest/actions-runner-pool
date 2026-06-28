@@ -1,0 +1,1 @@
+gharp ALL=(root) NOPASSWD: /usr/local/sbin/gharp-svc
