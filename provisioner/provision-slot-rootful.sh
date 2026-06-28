@@ -11,7 +11,8 @@
 #
 # Env overrides: SLOTS_YAML, PUBLIC_HOST, PORTAL_GROUP, RUNNER_IMAGE,
 #                GHARP_MEM_MAX, GHARP_CPU_QUOTA, RUNNER_MEM, RUNNER_CPUS,
-#                GHARP_MAX_RUNNERS (max concurrent runner containers; default 4).
+#                GHARP_MAX_RUNNERS (max concurrent runner containers; default 4),
+#                RUNNER_DIND (true = privileged in-runner dockerd for docker build; default false).
 
 set -eu
 
@@ -41,8 +42,19 @@ PORTAL_GROUP="${PORTAL_GROUP:-gharp}"
 RUNNER_IMAGE="${RUNNER_IMAGE:-myoung34/github-runner:latest}"
 GHARP_MEM_MAX="${GHARP_MEM_MAX:-4G}"
 GHARP_CPU_QUOTA="${GHARP_CPU_QUOTA:-200%}"
-RUNNER_MEM="${RUNNER_MEM:-2g}"
-RUNNER_CPUS="${RUNNER_CPUS:-1.0}"
+# RUNNER_DIND=true makes each ephemeral runner privileged and starts its own
+# dockerd inside the container, so jobs can `docker build` / `docker push`.
+# SECURITY TRADEOFF: --privileged grants the runner near-host-root capabilities
+# (kernel escape is possible). Use ONLY for trusted owners — the owner-allowlist
+# gate (access_settings) limits who can launch runners on this slot. Default off.
+RUNNER_DIND="${RUNNER_DIND:-false}"
+if [ "$RUNNER_DIND" = "true" ]; then
+    RUNNER_MEM="${RUNNER_MEM:-4g}"
+    RUNNER_CPUS="${RUNNER_CPUS:-2.0}"
+else
+    RUNNER_MEM="${RUNNER_MEM:-2g}"
+    RUNNER_CPUS="${RUNNER_CPUS:-1.0}"
+fi
 GHARP_MAX_RUNNERS="${GHARP_MAX_RUNNERS:-4}"
 
 echo ">>> Provisioning (rootful) slot ${SLOT_ID} — user ${OS_USER}, port ${PORT}"
@@ -70,11 +82,23 @@ docker network inspect "$NETWORK_NAME" >/dev/null 2>&1 || \
 echo "[3/6] env file + admin token"
 ADMIN_TOKEN_VALUE="$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-43)"
 ENV_FILE="/home/${OS_USER}/.gharp-env"
+# DinD slots get --privileged, an in-container dockerd (START_DOCKER_SERVICE),
+# the local socket as DOCKER_HOST, and a higher pids-limit (buildkit is greedy).
+# Each fragment carries its own trailing comma so the JSON stays valid when off.
+if [ "$RUNNER_DIND" = "true" ]; then
+    DIND_PRIV='"--privileged",'
+    DIND_ENV='"-e","START_DOCKER_SERVICE=true","-e","DOCKER_HOST=unix:///var/run/docker.sock",'
+    RUNNER_PIDS="4096"
+else
+    DIND_PRIV=""
+    DIND_ENV=""
+    RUNNER_PIDS="512"
+fi
 umask 077
 {
     printf 'ADMIN_TOKEN=%s\n' "$ADMIN_TOKEN_VALUE"
-    printf 'RUNNER_COMMAND=["docker","run","--rm","--network","%s","--memory","%s","--cpus","%s","--pids-limit","512","--name","{{.ContainerName}}","-e","REPO_URL={{.RepoURL}}","-e","RUNNER_TOKEN={{.RegistrationToken}}","-e","RUNNER_NAME={{.RunnerName}}","-e","LABELS={{.Labels}}","-e","EPHEMERAL=1","{{.Image}}"]\n' \
-        "$NETWORK_NAME" "$RUNNER_MEM" "$RUNNER_CPUS"
+    printf 'RUNNER_COMMAND=["docker","run","--rm",%s"--network","%s","--memory","%s","--cpus","%s","--pids-limit","%s","--name","{{.ContainerName}}","-e","REPO_URL={{.RepoURL}}","-e","RUNNER_TOKEN={{.RegistrationToken}}","-e","RUNNER_NAME={{.RunnerName}}","-e","LABELS={{.Labels}}","-e","EPHEMERAL=1",%s"{{.Image}}"]\n' \
+        "$DIND_PRIV" "$NETWORK_NAME" "$RUNNER_MEM" "$RUNNER_CPUS" "$RUNNER_PIDS" "$DIND_ENV"
 } > "$ENV_FILE"
 chown "${OS_USER}:${OS_USER}" "$ENV_FILE"; chmod 600 "$ENV_FILE"
 
