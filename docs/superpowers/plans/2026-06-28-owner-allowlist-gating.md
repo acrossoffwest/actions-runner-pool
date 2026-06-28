@@ -715,7 +715,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"sort"
 	"strings"
 
 	"github.com/muhac/actions-runner-pool/internal/config"
@@ -960,8 +959,6 @@ git commit -m "feat(dashboard): Access control panel for the owner allowlist"
 - Tests for store/github/webhook/access → Tasks 1–4. ✓
 - Out of scope (per-repo, portal-push, installation-event rejection) → not implemented. ✓
 
-**Placeholder scan:** No TBD/TODO; every code step is complete. The only
-conditional instruction (drop the no-op `sort` if it trips unused-import) is
-explicit with the exact action. ✓
+**Placeholder scan:** No TBD/TODO; every code step is complete code. ✓
 
 **Type consistency:** `appOwnerClient.AppJWT(pem []byte, appID int64) (string, error)` and `AppOwner(ctx, jwt string) (string, error)` match `*github.Client` (Task 2) and the fake (Task 3). `store.AppConfig.OwnerLogin`, `store.AccessSettings.AllowedOwners`, `UpdateAppOwnerLogin`, `GetAccessSettings`, `SaveAccessSettings` are identical across Tasks 1/3/4. `ownerAllowed(ctx, scheduler.Repository, *store.AppConfig) bool` and `handleWorkflowJob(..., appCfg *store.AppConfig)` consistent in Task 3. `accessView{app_owner, allowed_owners}` consistent across Task 4 + Task 5 JS. ✓
