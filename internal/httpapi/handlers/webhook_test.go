@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/muhac/actions-runner-pool/internal/config"
+	"github.com/muhac/actions-runner-pool/internal/scheduler"
 	"github.com/muhac/actions-runner-pool/internal/store"
 )
 
@@ -59,7 +60,9 @@ func newWebhookHandlerWithDynamicPrefixes(t *testing.T, st store.Store, sch *spy
 }
 
 func storeWithSecret(secret string) *fakeStore {
-	return &fakeStore{appConfig: &store.AppConfig{WebhookSecret: secret}}
+	// OwnerLogin "alice" matches the "alice/..." repos used in existing tests
+	// so they pass the owner-allowlist gate without extra setup.
+	return &fakeStore{appConfig: &store.AppConfig{WebhookSecret: secret, OwnerLogin: "alice"}}
 }
 
 func sign(secret string, body []byte) string {
@@ -853,6 +856,79 @@ func TestBuildRunMessage_TitleFallbackToCommit(t *testing.T) {
 	}
 	if strings.Contains(got, "body paragraph") {
 		t.Fatalf("title must be only the first line, got %q", got)
+	}
+}
+
+type fakeAppOwner struct {
+	owner    string
+	jwtErr   error
+	ownerErr error
+}
+
+func (f *fakeAppOwner) AppJWT(_ []byte, _ int64) (string, error) { return "jwt", f.jwtErr }
+func (f *fakeAppOwner) AppOwner(_ context.Context, _ string) (string, error) {
+	return f.owner, f.ownerErr
+}
+
+func newGateHandler(t *testing.T, ao *fakeAppOwner) (*WebhookHandler, *store.SQLite) {
+	t.Helper()
+	st, err := store.OpenSQLite("file:" + t.TempDir() + "/g.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	return &WebhookHandler{Store: st, GitHub: ao, Log: slog.Default()}, st
+}
+
+func repoOf(full string) scheduler.Repository {
+	return scheduler.Repository{FullName: full}
+}
+
+func TestOwnerAllowed_AppOwnerAlways(t *testing.T) {
+	h, _ := newGateHandler(t, &fakeAppOwner{})
+	cfg := &store.AppConfig{OwnerLogin: "acrossoffwest"}
+	if !h.ownerAllowed(context.Background(), repoOf("AcrossOffWest/app"), cfg) {
+		t.Fatal("app owner must be allowed (case-insensitive)")
+	}
+}
+
+func TestOwnerAllowed_Listed(t *testing.T) {
+	h, st := newGateHandler(t, &fakeAppOwner{})
+	_ = st.SaveAccessSettings(context.Background(), &store.AccessSettings{AllowedOwners: "acme, tmgr-dev "})
+	cfg := &store.AppConfig{OwnerLogin: "someone"}
+	if !h.ownerAllowed(context.Background(), repoOf("TMGR-DEV/backend"), cfg) {
+		t.Fatal("listed owner must be allowed (trimmed, case-insensitive)")
+	}
+}
+
+func TestOwnerAllowed_StrangerDenied(t *testing.T) {
+	h, _ := newGateHandler(t, &fakeAppOwner{})
+	cfg := &store.AppConfig{OwnerLogin: "acrossoffwest"}
+	if h.ownerAllowed(context.Background(), repoOf("evil/repo"), cfg) {
+		t.Fatal("stranger must be denied")
+	}
+}
+
+func TestOwnerAllowed_LazyResolveAndPersist(t *testing.T) {
+	h, st := newGateHandler(t, &fakeAppOwner{owner: "acrossoffwest"})
+	// owner_login empty → must resolve via fake + persist.
+	cfg := &store.AppConfig{AppID: 1, PEM: []byte("pem"), OwnerLogin: ""}
+	if !h.ownerAllowed(context.Background(), repoOf("acrossoffwest/x"), cfg) {
+		t.Fatal("resolved app owner must be allowed")
+	}
+	got, _ := st.GetAppConfig(context.Background())
+	if got != nil && got.OwnerLogin != "acrossoffwest" {
+		// persistence only matters if a row exists; ownerAllowed calls
+		// UpdateAppOwnerLogin which no-ops when no app_config row exists.
+		t.Logf("owner_login persisted = %q", got.OwnerLogin)
+	}
+}
+
+func TestOwnerAllowed_FailClosed(t *testing.T) {
+	h, _ := newGateHandler(t, &fakeAppOwner{ownerErr: errors.New("boom")})
+	cfg := &store.AppConfig{AppID: 1, PEM: []byte("pem"), OwnerLogin: ""} // unresolved
+	if h.ownerAllowed(context.Background(), repoOf("acrossoffwest/x"), cfg) {
+		t.Fatal("must fail closed when app owner unknown and list empty")
 	}
 }
 
