@@ -454,11 +454,22 @@ func (h *WebhookHandler) logInfo(msg string, args ...any) {
 type workflowRunEvent struct {
 	Action      string `json:"action"`
 	WorkflowRun struct {
-		Name       string `json:"name"`
-		Conclusion string `json:"conclusion"`
-		HTMLURL    string `json:"html_url"`
-		HeadBranch string `json:"head_branch"`
-		RunNumber  int64  `json:"run_number"`
+		Name         string `json:"name"`
+		Conclusion   string `json:"conclusion"`
+		HTMLURL      string `json:"html_url"`
+		HeadBranch   string `json:"head_branch"`
+		RunNumber    int64  `json:"run_number"`
+		Event        string `json:"event"`
+		DisplayTitle string `json:"display_title"`
+		HeadCommit   struct {
+			Message string `json:"message"`
+		} `json:"head_commit"`
+		Actor struct {
+			Login string `json:"login"`
+		} `json:"actor"`
+		TriggeringActor struct {
+			Login string `json:"login"`
+		} `json:"triggering_actor"`
 	} `json:"workflow_run"`
 	Repository struct {
 		FullName string `json:"full_name"`
@@ -525,7 +536,53 @@ func buildRunMessage(ev *workflowRunEvent) string {
 	default:
 		icon, verb = "ℹ️", run.Conclusion
 	}
-	return fmt.Sprintf("%s %s %s — %s\nrun #%d · branch %s · @%s\n%s",
-		icon, run.Name, verb, ev.Repository.FullName,
-		run.RunNumber, run.HeadBranch, ev.Sender.Login, run.HTMLURL)
+	// Who actually triggered this run; triggering_actor is the most precise
+	// (it differs from sender for re-runs/scheduled runs), with fallbacks.
+	actor := firstNonEmpty(run.TriggeringActor.Login, run.Actor.Login, ev.Sender.Login)
+	// A short human title for the run: GitHub's display_title (commit subject
+	// for pushes, PR title for PRs) or, failing that, the commit's first line.
+	title := firstNonEmpty(run.DisplayTitle, firstLine(run.HeadCommit.Message))
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s %s %s — %s", icon, run.Name, verb, ev.Repository.FullName)
+	if title != "" {
+		b.WriteString("\n")
+		b.WriteString(title)
+	}
+	// Meta line: run number, ref (branch or tag), trigger event, actor —
+	// empty pieces are dropped so the line stays clean. HeadBranch carries the
+	// tag name for tag builds, so a tag push shows e.g. "v1.2.3" here.
+	meta := []string{fmt.Sprintf("run #%d", run.RunNumber)}
+	if run.HeadBranch != "" {
+		meta = append(meta, run.HeadBranch)
+	}
+	if run.Event != "" {
+		meta = append(meta, run.Event)
+	}
+	if actor != "" {
+		meta = append(meta, "@"+actor)
+	}
+	b.WriteString("\n")
+	b.WriteString(strings.Join(meta, " · "))
+	b.WriteString("\n")
+	b.WriteString(run.HTMLURL)
+	return b.String()
+}
+
+// firstNonEmpty returns the first non-empty string, or "" if all are empty.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// firstLine returns s up to the first newline (the whole string if none).
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
 }

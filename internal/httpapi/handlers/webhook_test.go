@@ -789,9 +789,49 @@ func TestBuildRunMessage_FormatByConclusion(t *testing.T) {
 		if !strings.HasPrefix(got, c.icon+" CI "+c.verb+" — o/r") {
 			t.Fatalf("conclusion %q: got %q", c.concl, got)
 		}
-		if !strings.Contains(got, "run #7 · branch main · @alice") || !strings.Contains(got, "https://x/runs/1") {
+		if !strings.Contains(got, "run #7 · main · @alice") || !strings.Contains(got, "https://x/runs/1") {
 			t.Fatalf("conclusion %q body: %q", c.concl, got)
 		}
+	}
+}
+
+func TestBuildRunMessage_Enriched(t *testing.T) {
+	ev := &workflowRunEvent{}
+	ev.Action = "completed"
+	ev.WorkflowRun.Name = "deploy"
+	ev.WorkflowRun.Conclusion = "success"
+	ev.WorkflowRun.HTMLURL = "https://x/runs/9"
+	ev.WorkflowRun.HeadBranch = "v1.2.3"
+	ev.WorkflowRun.RunNumber = 42
+	ev.WorkflowRun.Event = "push"
+	ev.WorkflowRun.DisplayTitle = "fix: bump to v1.2.3"
+	ev.WorkflowRun.TriggeringActor.Login = "bob"
+	ev.WorkflowRun.Actor.Login = "ignored"
+	ev.Sender.Login = "ignored2"
+	ev.Repository.FullName = "acme/app"
+
+	got := buildRunMessage(ev)
+	want := "✅ deploy passed — acme/app\nfix: bump to v1.2.3\nrun #42 · v1.2.3 · push · @bob\nhttps://x/runs/9"
+	if got != want {
+		t.Fatalf("enriched message mismatch:\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestBuildRunMessage_TitleFallbackToCommit(t *testing.T) {
+	ev := &workflowRunEvent{}
+	ev.WorkflowRun.Name = "CI"
+	ev.WorkflowRun.Conclusion = "failure"
+	ev.WorkflowRun.HeadCommit.Message = "first line of commit\n\nbody paragraph"
+	ev.WorkflowRun.RunNumber = 3
+	ev.Repository.FullName = "o/r"
+	ev.Sender.Login = "carol"
+
+	got := buildRunMessage(ev)
+	if !strings.Contains(got, "\nfirst line of commit\n") {
+		t.Fatalf("expected commit first line as title, got %q", got)
+	}
+	if strings.Contains(got, "body paragraph") {
+		t.Fatalf("title must be only the first line, got %q", got)
 	}
 }
 
