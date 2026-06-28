@@ -610,6 +610,22 @@ body.loading .board{display:grid}
       </div>
     </div>
 
+    <!-- Access control -->
+    <p class="adm-section-head">Access control</p>
+    <div class="adm-block" id="accessCard">
+      <h5>Who can use this runner</h5>
+      <p>Only repos owned by these accounts/orgs launch runners here. The App owner is always allowed.</p>
+      <p class="muted">App owner: <span id="acOwner">…</span> <span class="muted">(always allowed)</span></p>
+      <div class="inrow">
+        <label for="acOwners">Allowed owners (comma or newline separated)</label>
+        <textarea class="txt" id="acOwners" rows="3" placeholder="tmgr-dev, my-org" autocomplete="off"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+        <button class="iconbtn" id="acSave" type="button"{{if not .AllowAdminEdit}} disabled{{end}} style="height:36px">Save owners</button>
+        <span id="acState" class="muted"></span>
+      </div>
+    </div>
+
     <!-- Rotate credentials (advanced; collapsed by default) -->
     <details class="adv-section">
     <summary>Advanced · Rotate credentials</summary>
@@ -1141,6 +1157,34 @@ document.getElementById('ntTest').addEventListener('click', async ()=>{
 });
 
 ntLoad();
+
+/* ---- access control panel ---- */
+function acHeaders(json){
+  const h = State.token ? {Authorization:'Bearer '+State.token} : {};
+  if(json) h['Content-Type']='application/json';
+  return h;
+}
+async function acLoad(){
+  try{
+    const r = await fetch('access',{headers:acHeaders(false)});
+    if(!r.ok) return;
+    const v = await r.json();
+    document.getElementById('acOwner').textContent = v.app_owner || '(unknown)';
+    document.getElementById('acOwners').value = (v.allowed_owners||[]).join('\n');
+  }catch(e){/* leave defaults */}
+}
+document.getElementById('acSave').addEventListener('click', async ()=>{
+  const raw = document.getElementById('acOwners').value;
+  const owners = raw.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
+  try{
+    const r = await fetch('access/owners',{method:'POST',headers:acHeaders(true),body:JSON.stringify({owners})});
+    if(!r.ok){ throw new Error((await r.text())||('HTTP '+r.status)); }
+    const v = await r.json();
+    document.getElementById('acOwners').value = (v.allowed_owners||[]).join('\n');
+    document.getElementById('acState').textContent = 'saved ✓';
+  }catch(e){ document.getElementById('acState').textContent = 'error: '+e.message; }
+});
+acLoad();
 
 /* boot */
 applyReadonly();
