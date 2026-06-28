@@ -545,7 +545,11 @@ func buildRunMessage(ev *workflowRunEvent) string {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s %s %s — %s", icon, run.Name, verb, ev.Repository.FullName)
-	if title != "" {
+	// Skip the title line when it adds nothing: GitHub sets display_title to
+	// the workflow name for runs with no commit subject (workflow_dispatch,
+	// schedule), which would just duplicate line 1. A real push shows the
+	// commit subject here instead.
+	if title != "" && !strings.EqualFold(title, run.Name) {
 		b.WriteString("\n")
 		b.WriteString(title)
 	}

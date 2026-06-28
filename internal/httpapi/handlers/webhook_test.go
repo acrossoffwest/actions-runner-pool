@@ -817,6 +817,25 @@ func TestBuildRunMessage_Enriched(t *testing.T) {
 	}
 }
 
+func TestBuildRunMessage_DropsTitleEqualToWorkflowName(t *testing.T) {
+	ev := &workflowRunEvent{}
+	ev.WorkflowRun.Name = "pipeline-3jobs"
+	ev.WorkflowRun.Conclusion = "success"
+	ev.WorkflowRun.DisplayTitle = "pipeline-3jobs" // GitHub's dispatch/schedule default
+	ev.WorkflowRun.HeadBranch = "main"
+	ev.WorkflowRun.Event = "workflow_dispatch"
+	ev.WorkflowRun.RunNumber = 3
+	ev.WorkflowRun.HTMLURL = "https://x/runs/3"
+	ev.Repository.FullName = "o/r"
+	ev.Sender.Login = "alice"
+
+	got := buildRunMessage(ev)
+	want := "✅ pipeline-3jobs passed — o/r\nrun #3 · main · workflow_dispatch · @alice\nhttps://x/runs/3"
+	if got != want {
+		t.Fatalf("redundant title not dropped:\n got: %q\nwant: %q", got, want)
+	}
+}
+
 func TestBuildRunMessage_TitleFallbackToCommit(t *testing.T) {
 	ev := &workflowRunEvent{}
 	ev.WorkflowRun.Name = "CI"
