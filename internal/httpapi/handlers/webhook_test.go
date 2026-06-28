@@ -254,6 +254,25 @@ func TestWebhook_QueuedStoreError_503AndNoEnqueue(t *testing.T) {
 	}
 }
 
+func TestWebhook_QueuedStrangerOwner_Dropped(t *testing.T) {
+	body := []byte(`{
+		"action": "queued",
+		"workflow_job": {"id": 777, "labels": ["self-hosted"]},
+		"repository": {"full_name": "evil/repo", "private": true},
+		"installation": {"id": 99}
+	}`)
+	st := storeWithSecret(testWebhookSecret) // OwnerLogin "alice" — "evil" is a stranger
+	sch := &spyEnqueuer{}
+	h := newWebhookHandler(t, st, sch, nil)
+	rr := postWebhook(t, h, "workflow_job", body, sign(testWebhookSecret, body))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	if sch.calls.Load() != 0 {
+		t.Fatalf("stranger owner must not be enqueued, calls=%d", sch.calls.Load())
+	}
+}
+
 func TestWebhook_PublicRepo_DefaultDrops(t *testing.T) {
 	body := []byte(`{
 		"action": "queued",
@@ -911,16 +930,22 @@ func TestOwnerAllowed_StrangerDenied(t *testing.T) {
 
 func TestOwnerAllowed_LazyResolveAndPersist(t *testing.T) {
 	h, st := newGateHandler(t, &fakeAppOwner{owner: "acrossoffwest"})
-	// owner_login empty → must resolve via fake + persist.
-	cfg := &store.AppConfig{AppID: 1, PEM: []byte("pem"), OwnerLogin: ""}
-	if !h.ownerAllowed(context.Background(), repoOf("acrossoffwest/x"), cfg) {
+	ctx := context.Background()
+	// Seed an app_config row with an empty owner_login so the lazy resolve
+	// has a row to persist into.
+	if err := st.SaveAppConfig(ctx, &store.AppConfig{
+		AppID: 1, Slug: "s", WebhookSecret: "wsecretwsecret16", PEM: []byte("pem"),
+		ClientID: "c", BaseURL: "https://x", OwnerLogin: "",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := st.GetAppConfig(ctx)
+	if !h.ownerAllowed(ctx, repoOf("acrossoffwest/x"), cfg) {
 		t.Fatal("resolved app owner must be allowed")
 	}
-	got, _ := st.GetAppConfig(context.Background())
-	if got != nil && got.OwnerLogin != "acrossoffwest" {
-		// persistence only matters if a row exists; ownerAllowed calls
-		// UpdateAppOwnerLogin which no-ops when no app_config row exists.
-		t.Logf("owner_login persisted = %q", got.OwnerLogin)
+	got, _ := st.GetAppConfig(ctx)
+	if got == nil || got.OwnerLogin != "acrossoffwest" {
+		t.Fatalf("owner_login must be persisted via UpdateAppOwnerLogin, got %+v", got)
 	}
 }
 

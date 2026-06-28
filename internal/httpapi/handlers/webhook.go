@@ -420,6 +420,9 @@ func (h *WebhookHandler) ownerAllowed(ctx context.Context, repo scheduler.Reposi
 		h.logError("owner gate: load access settings", err)
 		return false
 	}
+	if access == nil {
+		return false
+	}
 	for _, e := range strings.Split(access.AllowedOwners, ",") {
 		if e = strings.TrimSpace(e); e != "" && strings.EqualFold(e, owner) {
 			return true
