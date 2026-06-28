@@ -29,6 +29,7 @@ type AppCredentials struct {
 	PEM           []byte
 	ClientID      string
 	ClientSecret  string
+	OwnerLogin    string
 }
 
 // BuildManifest creates a GitHub App manifest for the given base URL.
@@ -92,6 +93,9 @@ func (c *Client) ConvertCode(ctx context.Context, code string) (*AppCredentials,
 		PEM           string `json:"pem"`
 		ClientID      string `json:"client_id"`
 		ClientSecret  string `json:"client_secret"`
+		Owner         struct {
+			Login string `json:"login"`
+		} `json:"owner"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return nil, fmt.Errorf("decode manifest response: %w", err)
@@ -103,5 +107,6 @@ func (c *Client) ConvertCode(ctx context.Context, code string) (*AppCredentials,
 		PEM:           []byte(body.PEM),
 		ClientID:      body.ClientID,
 		ClientSecret:  body.ClientSecret,
+		OwnerLogin:    body.Owner.Login,
 	}, nil
 }

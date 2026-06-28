@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS app_config (
   client_id       TEXT    NOT NULL,
   client_secret   TEXT    NOT NULL DEFAULT '',
   base_url        TEXT    NOT NULL,
+  owner_login     TEXT    NOT NULL DEFAULT '',
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -23,6 +24,11 @@ CREATE TABLE IF NOT EXISTS notify_settings (
   tg_chat_id   TEXT    NOT NULL DEFAULT '',
   chat_title   TEXT    NOT NULL DEFAULT '',
   mode         TEXT    NOT NULL DEFAULT 'all'
+);
+
+CREATE TABLE IF NOT EXISTS access_settings (
+  id             INTEGER PRIMARY KEY CHECK (id = 1),
+  allowed_owners TEXT    NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS installations (

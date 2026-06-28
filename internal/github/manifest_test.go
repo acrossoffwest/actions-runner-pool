@@ -53,7 +53,8 @@ func TestConvertCode_HappyPath(t *testing.T) {
 			"webhook_secret": "shhh",
 			"pem": "-----BEGIN RSA PRIVATE KEY-----\nFAKE\n-----END RSA PRIVATE KEY-----\n",
 			"client_id": "Iv1.abc",
-			"client_secret": "secretvalue"
+			"client_secret": "secretvalue",
+			"owner": {"login": "acrossoffwest"}
 		}`))
 	}))
 	t.Cleanup(srv.Close)
@@ -71,6 +72,9 @@ func TestConvertCode_HappyPath(t *testing.T) {
 	}
 	if !strings.Contains(string(creds.PEM), "BEGIN RSA PRIVATE KEY") {
 		t.Errorf("pem not preserved as bytes: %q", creds.PEM)
+	}
+	if creds.OwnerLogin != "acrossoffwest" {
+		t.Errorf("OwnerLogin = %q, want %q", creds.OwnerLogin, "acrossoffwest")
 	}
 }
 

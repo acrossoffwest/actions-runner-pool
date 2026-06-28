@@ -1430,4 +1430,7 @@ func (e *errStore) ActiveRunnerCount(context.Context) (int, error)              
 func (e *errStore) ListActiveRunners(context.Context) ([]*store.Runner, error)             { panic("unused") }
 func (e *errStore) GetNotifySettings(context.Context) (*store.NotifySettings, error)       { panic("unused") }
 func (e *errStore) SaveNotifySettings(context.Context, *store.NotifySettings) error        { panic("unused") }
+func (e *errStore) UpdateAppOwnerLogin(context.Context, string) error                      { panic("unused") }
+func (e *errStore) GetAccessSettings(context.Context) (*store.AccessSettings, error)       { panic("unused") }
+func (e *errStore) SaveAccessSettings(context.Context, *store.AccessSettings) error        { panic("unused") }
 func (e *errStore) Close() error                                                           { return nil }

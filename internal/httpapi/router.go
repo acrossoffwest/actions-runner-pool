@@ -47,8 +47,12 @@ func NewRouter(cfg *config.Config, st store.Store, gh *github.Client, sch *sched
 
 	tg := notify.New()
 
-	wh := &handlers.WebhookHandler{Cfg: cfg, Store: st, Scheduler: sch, Telegram: tg, Log: log}
+	wh := &handlers.WebhookHandler{Cfg: cfg, Store: st, Scheduler: sch, Telegram: tg, GitHub: gh, Log: log}
 	mux.HandleFunc("POST /github/webhook", wh.Post)
+
+	access := &handlers.AccessHandler{Cfg: cfg, Store: st, Log: log}
+	mux.HandleFunc("GET /access", access.GetAccess)
+	mux.HandleFunc("POST /access/owners", access.SaveOwners)
 
 	notif := &handlers.NotificationsHandler{Cfg: cfg, Store: st, Telegram: tg, Log: log}
 	mux.HandleFunc("GET /notifications", notif.GetSettings)

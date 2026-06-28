@@ -136,6 +136,14 @@ func (f *fakeStore) UpdateRunnerStatusByName(_ context.Context, runnerName, stat
 	return nil
 }
 
+func (f *fakeStore) GetAccessSettings(_ context.Context) (*store.AccessSettings, error) {
+	return &store.AccessSettings{}, nil
+}
+
+func (f *fakeStore) UpdateAppOwnerLogin(_ context.Context, _ string) error {
+	return nil
+}
+
 func newSetupHandler(t *testing.T, baseURL string, st store.Store) *SetupHandler {
 	t.Helper()
 	return &SetupHandler{

@@ -762,6 +762,60 @@ func TestNotifySettings_RoundTripAndDefault(t *testing.T) {
 	}
 }
 
+func TestAppConfig_OwnerLogin(t *testing.T) {
+	s, err := OpenSQLite("file:" + t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+
+	if err := s.SaveAppConfig(ctx, &AppConfig{
+		AppID: 1, Slug: "a", WebhookSecret: "wsecretwsecret16", PEM: []byte("p"),
+		ClientID: "cid", BaseURL: "https://x", OwnerLogin: "alice",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetAppConfig(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.OwnerLogin != "alice" {
+		t.Fatalf("OwnerLogin = %q, want alice", got.OwnerLogin)
+	}
+	if err := s.UpdateAppOwnerLogin(ctx, "bob"); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = s.GetAppConfig(ctx)
+	if got.OwnerLogin != "bob" {
+		t.Fatalf("after update OwnerLogin = %q, want bob", got.OwnerLogin)
+	}
+}
+
+func TestAccessSettings_RoundTripAndDefault(t *testing.T) {
+	s, err := OpenSQLite("file:" + t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+
+	got, err := s.GetAccessSettings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AllowedOwners != "" {
+		t.Fatalf("default AllowedOwners = %q, want empty", got.AllowedOwners)
+	}
+	if err := s.SaveAccessSettings(ctx, &AccessSettings{AllowedOwners: "tmgr-dev,acme"}); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = s.GetAccessSettings(ctx)
+	if got.AllowedOwners != "tmgr-dev,acme" {
+		t.Fatalf("AllowedOwners = %q", got.AllowedOwners)
+	}
+}
+
 func itoa(n int64) string {
 	if n == 0 {
 		return "0"

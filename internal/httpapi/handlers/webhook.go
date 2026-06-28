@@ -31,12 +31,20 @@ type messageSender interface {
 	SendMessage(ctx context.Context, token, chatID, text string) error
 }
 
+// appOwnerClient is the subset of *github.Client used to resolve the App
+// owner login for the owner-allowlist gate.
+type appOwnerClient interface {
+	AppJWT(pem []byte, appID int64) (string, error)
+	AppOwner(ctx context.Context, jwt string) (string, error)
+}
+
 // WebhookHandler handles GitHub webhook events.
 type WebhookHandler struct {
 	Cfg       *config.Config
 	Store     store.Store
 	Scheduler jobEnqueuer
-	Telegram  messageSender // nil disables notifications (e.g. in unrelated tests)
+	Telegram  messageSender  // nil disables notifications (e.g. in unrelated tests)
+	GitHub    appOwnerClient // nil disables owner-gate lazy resolve (e.g. in unrelated tests)
 	Log       *slog.Logger
 }
 
@@ -85,7 +93,7 @@ func (h *WebhookHandler) Post(w http.ResponseWriter, r *http.Request) {
 	case "installation_repositories":
 		h.handleInstallationRepositories(w, r, body)
 	case "workflow_job":
-		h.handleWorkflowJob(w, r, body)
+		h.handleWorkflowJob(w, r, body, cfg)
 	case "workflow_run":
 		h.handleWorkflowRun(w, r, body)
 	default:
@@ -254,7 +262,7 @@ func (h *WebhookHandler) handleInstallationRepositories(w http.ResponseWriter, r
 
 // ---------------- workflow_job ----------------
 
-func (h *WebhookHandler) handleWorkflowJob(w http.ResponseWriter, r *http.Request, body []byte) {
+func (h *WebhookHandler) handleWorkflowJob(w http.ResponseWriter, r *http.Request, body []byte, appCfg *store.AppConfig) {
 	var ev scheduler.WorkflowJobEvent
 	if err := json.Unmarshal(body, &ev); err != nil {
 		http.Error(w, "decode workflow_job event", http.StatusBadRequest)
@@ -274,6 +282,16 @@ func (h *WebhookHandler) handleWorkflowJob(w http.ResponseWriter, r *http.Reques
 					"repo", ev.Repository.FullName,
 					"job_id", ev.WorkflowJob.ID,
 					"action", ev.Action,
+				)
+			}
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if !h.ownerAllowed(r.Context(), ev.Repository, appCfg) {
+			if h.Log != nil {
+				h.Log.Warn("webhook: owner not allowed",
+					"repo", ev.Repository.FullName,
+					"job_id", ev.WorkflowJob.ID,
 				)
 			}
 			w.WriteHeader(http.StatusOK)
@@ -355,6 +373,62 @@ func (h *WebhookHandler) handleWorkflowJob(w http.ResponseWriter, r *http.Reques
 	default:
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+// ownerOf returns the account/org login from a "owner/repo" full name.
+func ownerOf(fullName string) string {
+	if i := strings.IndexByte(fullName, '/'); i > 0 {
+		return fullName[:i]
+	}
+	return ""
+}
+
+// ownerAllowed reports whether a runner may be launched for repo. The repo's
+// owner is allowed if it matches the App owner (resolved lazily + persisted)
+// or any entry in access_settings.allowed_owners (case-insensitive). Fails
+// closed: if the App owner can't be determined and the list is empty, deny.
+func (h *WebhookHandler) ownerAllowed(ctx context.Context, repo scheduler.Repository, appCfg *store.AppConfig) bool {
+	owner := ownerOf(repo.FullName)
+	if owner == "" {
+		return false
+	}
+
+	appOwner := ""
+	if appCfg != nil {
+		appOwner = appCfg.OwnerLogin
+	}
+	// Lazily resolve the App owner once and persist it.
+	if appOwner == "" && appCfg != nil && h.GitHub != nil && len(appCfg.PEM) > 0 && appCfg.AppID != 0 {
+		jwt, err := h.GitHub.AppJWT(appCfg.PEM, appCfg.AppID)
+		if err != nil {
+			h.logError("owner gate: app jwt", err)
+		} else if o, err := h.GitHub.AppOwner(ctx, jwt); err != nil {
+			h.logError("owner gate: resolve app owner", err)
+		} else if o != "" {
+			appOwner = o
+			if err := h.Store.UpdateAppOwnerLogin(ctx, o); err != nil {
+				h.logError("owner gate: persist app owner", err)
+			}
+		}
+	}
+	if appOwner != "" && strings.EqualFold(owner, appOwner) {
+		return true
+	}
+
+	access, err := h.Store.GetAccessSettings(ctx)
+	if err != nil {
+		h.logError("owner gate: load access settings", err)
+		return false
+	}
+	if access == nil {
+		return false
+	}
+	for _, e := range strings.Split(access.AllowedOwners, ",") {
+		if e = strings.TrimSpace(e); e != "" && strings.EqualFold(e, owner) {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *WebhookHandler) publicRepoAllowed(repo scheduler.Repository) bool {

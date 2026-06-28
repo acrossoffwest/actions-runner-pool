@@ -28,7 +28,7 @@ func TestSchema_AppliesAndIdempotent(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatalf("rows iteration: %v", err)
 	}
-	want := []string{"app_config", "installation_repos", "installations", "instance", "jobs", "notify_settings", "runners"}
+	want := []string{"access_settings", "app_config", "installation_repos", "installations", "instance", "jobs", "notify_settings", "runners"}
 	if len(got) != len(want) {
 		t.Fatalf("tables = %v, want %v", got, want)
 	}
