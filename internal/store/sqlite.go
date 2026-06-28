@@ -613,3 +613,36 @@ func (s *SQLite) ListActiveRunners(ctx context.Context) ([]*Runner, error) {
 	}
 	return out, rows.Err()
 }
+
+func (s *SQLite) GetNotifySettings(ctx context.Context) (*NotifySettings, error) {
+	const q = `SELECT enabled, tg_bot_token, tg_chat_id, chat_title, mode
+		FROM notify_settings WHERE id = 1`
+	var (
+		n       NotifySettings
+		enabled int
+	)
+	err := s.db.QueryRowContext(ctx, q).Scan(&enabled, &n.BotToken, &n.ChatID, &n.ChatTitle, &n.Mode)
+	if errors.Is(err, sql.ErrNoRows) {
+		return &NotifySettings{Mode: "all"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	n.Enabled = enabled != 0
+	return &n, nil
+}
+
+func (s *SQLite) SaveNotifySettings(ctx context.Context, n *NotifySettings) error {
+	const q = `
+INSERT INTO notify_settings (id, enabled, tg_bot_token, tg_chat_id, chat_title, mode)
+VALUES (1, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+  enabled=excluded.enabled, tg_bot_token=excluded.tg_bot_token,
+  tg_chat_id=excluded.tg_chat_id, chat_title=excluded.chat_title, mode=excluded.mode`
+	enabled := 0
+	if n.Enabled {
+		enabled = 1
+	}
+	_, err := s.db.ExecContext(ctx, q, enabled, n.BotToken, n.ChatID, n.ChatTitle, n.Mode)
+	return err
+}

@@ -15,6 +15,13 @@ type Store interface {
 	UpdateAppConfigPEM(ctx context.Context, pem []byte) error
 	UpdateAppConfigClientSecret(ctx context.Context, secret string) error
 
+	// GetNotifySettings returns the single-row Telegram notification
+	// config. It never returns nil: an absent row yields disabled
+	// defaults with Mode "all".
+	GetNotifySettings(ctx context.Context) (*NotifySettings, error)
+	// SaveNotifySettings upserts the single-row (id=1) notification config.
+	SaveNotifySettings(ctx context.Context, n *NotifySettings) error
+
 	UpsertInstallation(ctx context.Context, inst *Installation) error
 	ListInstallations(ctx context.Context) ([]*Installation, error)
 

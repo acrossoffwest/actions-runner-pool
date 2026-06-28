@@ -732,6 +732,36 @@ func TestRetryJobIfCompleted(t *testing.T) {
 	}
 }
 
+func TestNotifySettings_RoundTripAndDefault(t *testing.T) {
+	s, err := OpenSQLite("file:" + t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+
+	// Absent row → safe defaults (disabled, mode "all").
+	got, err := s.GetNotifySettings(ctx)
+	if err != nil {
+		t.Fatalf("GetNotifySettings (default): %v", err)
+	}
+	if got.Enabled || got.Mode != "all" || got.BotToken != "" {
+		t.Fatalf("default not as expected: %+v", got)
+	}
+
+	want := &NotifySettings{Enabled: true, BotToken: "123:abc", ChatID: "-100777", ChatTitle: "Team CI", Mode: "failures"}
+	if err := s.SaveNotifySettings(ctx, want); err != nil {
+		t.Fatalf("SaveNotifySettings: %v", err)
+	}
+	got, err = s.GetNotifySettings(ctx)
+	if err != nil {
+		t.Fatalf("GetNotifySettings: %v", err)
+	}
+	if *got != *want {
+		t.Fatalf("round-trip mismatch: got %+v want %+v", got, want)
+	}
+}
+
 func itoa(n int64) string {
 	if n == 0 {
 		return "0"

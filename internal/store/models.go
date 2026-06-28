@@ -14,6 +14,17 @@ type AppConfig struct {
 	CreatedAt     time.Time
 }
 
+// NotifySettings holds the per-instance Telegram notification config.
+// Mode is "all" (notify on every completed run) or "failures" (skip
+// successful runs). The bot token is a secret — never log it.
+type NotifySettings struct {
+	Enabled   bool
+	BotToken  string
+	ChatID    string
+	ChatTitle string
+	Mode      string
+}
+
 // Installation represents a GitHub App installation.
 type Installation struct {
 	ID           int64
