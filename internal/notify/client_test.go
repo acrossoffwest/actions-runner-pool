@@ -54,7 +54,9 @@ func TestSendMessage_NonOKIsError(t *testing.T) {
 }
 
 func TestGetUpdates_ParsesChat(t *testing.T) {
+	var gotPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
 		_, _ = w.Write([]byte(`{"ok":true,"result":[{"message":{"chat":{"id":42,"title":"CI","type":"group"}}}]}`))
 	}))
 	defer srv.Close()
@@ -67,5 +69,33 @@ func TestGetUpdates_ParsesChat(t *testing.T) {
 	}
 	if len(ups) != 1 || ups[0].Message.Chat.ID != 42 || ups[0].Message.Chat.Title != "CI" {
 		t.Fatalf("parsed = %+v", ups)
+	}
+	if gotPath != "/bott/getUpdates" {
+		t.Fatalf("path = %q", gotPath)
+	}
+}
+
+func TestSendMessage_DoErrorRedactsToken(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Close() // connections now fail → Do returns a *url.Error containing the URL
+	c := New()
+	c.BaseURL = srv.URL
+	err := c.SendMessage(context.Background(), "SECRET-TOKEN-123", "1", "x")
+	if err == nil {
+		t.Fatal("expected an error from a closed server")
+	}
+	if strings.Contains(err.Error(), "SECRET-TOKEN-123") {
+		t.Fatalf("token leaked in error: %q", err.Error())
+	}
+}
+
+func TestGetUpdates_DoErrorRedactsToken(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Close()
+	c := New()
+	c.BaseURL = srv.URL
+	_, err := c.GetUpdates(context.Background(), "SECRET-TOKEN-123")
+	if err == nil || strings.Contains(err.Error(), "SECRET-TOKEN-123") {
+		t.Fatalf("token leaked or no error: %v", err)
 	}
 }

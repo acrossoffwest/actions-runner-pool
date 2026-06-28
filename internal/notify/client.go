@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -48,6 +50,21 @@ type apiError struct {
 	Description string `json:"description"`
 }
 
+// redactToken returns err with every occurrence of token removed. net/http
+// embeds the request URL — which contains "/bot<token>/..." — in the
+// *url.Error returned by Do, so a transport failure would otherwise leak the
+// bot token into logs or HTTP responses. Security-critical: the token is a
+// secret and must never surface.
+func redactToken(err error, token string) error {
+	if err == nil {
+		return nil
+	}
+	if token == "" {
+		return err
+	}
+	return errors.New(strings.ReplaceAll(err.Error(), token, "<redacted>"))
+}
+
 // SendMessage posts text to chatID using the given bot token. The token
 // appears only in the URL path and is never logged here. Non-2xx (or
 // ok:false) responses become an error carrying Telegram's description.
@@ -68,7 +85,7 @@ func (c *Client) SendMessage(ctx context.Context, token, chatID, text string) er
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return err
+		return redactToken(err, token)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
@@ -93,10 +110,18 @@ func (c *Client) GetUpdates(ctx context.Context, token string) ([]Update, error)
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, redactToken(err, token)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode/100 != 2 {
+		var ae apiError
+		_ = json.Unmarshal(body, &ae)
+		if ae.Description != "" {
+			return nil, fmt.Errorf("telegram getUpdates: %s", ae.Description)
+		}
+		return nil, fmt.Errorf("telegram getUpdates: HTTP %d", resp.StatusCode)
+	}
 	var env struct {
 		OK          bool     `json:"ok"`
 		Description string   `json:"description"`
