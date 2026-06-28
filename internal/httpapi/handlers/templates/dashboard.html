@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>gharp · Runner Pool</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪉</text></svg>">
-<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="css/tokens.css">
 <style>
 /* ---------- shell ---------- */
 .wrap{max-width:var(--maxw);margin:0 auto;padding:18px clamp(14px,3vw,28px) 64px}
@@ -466,7 +466,7 @@ body.loading .board{display:grid}
     <div class="ei">⚙️</div>
     <h3>No GitHub App configured</h3>
     <p>gharp isn't connected to GitHub yet. Run the guided setup to create and install the App, then jobs will flow in here.</p>
-    <a class="iconbtn btn-primary" href="/setup">Start setup →</a>
+    <a class="iconbtn btn-primary" href="setup">Start setup →</a>
   </div>
 
   <!-- footer -->
@@ -475,7 +475,7 @@ body.loading .board{display:grid}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
       Public repos blocked
     </span>
-    <a href="/metrics" target="_blank" rel="noopener">Prometheus /metrics ↗</a>
+    <a href="metrics" target="_blank" rel="noopener">Prometheus /metrics ↗</a>
     <div class="spacer"></div>
     <span>Polling every <b id="pollSecs">10</b>s · <span id="tableCount" class="sr-only"></span></span>
   </footer>
@@ -813,13 +813,13 @@ async function poll(){
   try{
     const hdrs=State.token?{Authorization:'Bearer '+State.token}:{};
     const [st,jb]=await Promise.all([
-      fetch('/stats',{headers:hdrs}).then(r=>{if(!r.ok)throw{status:r.status};return r.json();}),
-      fetch('/jobs?status=&repo=&limit=200',{headers:hdrs}).then(r=>{if(!r.ok)throw{status:r.status};return r.json();}),
+      fetch('stats',{headers:hdrs}).then(r=>{if(!r.ok)throw{status:r.status};return r.json();}),
+      fetch('jobs?status=&repo=&limit=200',{headers:hdrs}).then(r=>{if(!r.ok)throw{status:r.status};return r.json();}),
     ]);
     State.stats=st;State.jobs=jb.jobs||[];
     if(State.firstLoad){
       try{
-        const ir=await fetch('/installations',{headers:hdrs});
+        const ir=await fetch('installations',{headers:hdrs});
         if(ir.ok)State.installs=await ir.json();else deriveInstalls();
       }catch{deriveInstalls();}
       State.firstLoad=false;
@@ -900,7 +900,7 @@ async function mutate(act,id){
   if(!allowAdminEdit){toast('Read-only mode','err');return;}
   if(!State.token){openDrawer('#adminDrawer');$('#tokenInput').focus();toast('Admin token required','err');return;}
   try{
-    const r=await fetch(`/jobs/${id}/${act}`,{method:'POST',headers:{Authorization:'Bearer '+State.token}});
+    const r=await fetch(`jobs/${id}/${act}`,{method:'POST',headers:{Authorization:'Bearer '+State.token}});
     if(!r.ok)throw{status:r.status};
     toast(act==='retry'?'Job re-queued':'Job cancelled','ok');
     await poll();
@@ -991,7 +991,7 @@ $$('#rotateBlocks [data-rotate]').forEach(block=>{
     if(!State.token){toast('Admin token required','err');$('#tokenInput').focus();return;}
     if(!inp.value.trim()){toast('Enter a value','err');return;}
     try{
-      const r=await fetch('/admin/app-config',{method:'PATCH',
+      const r=await fetch('admin/app-config',{method:'PATCH',
         headers:{Authorization:'Bearer '+State.token,'Content-Type':'application/json'},
         body:JSON.stringify({[block.dataset.rotate]:inp.value})});
       if(!r.ok)throw{status:r.status};
