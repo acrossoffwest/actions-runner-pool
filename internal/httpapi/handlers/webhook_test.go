@@ -786,11 +786,13 @@ func TestBuildRunMessage_FormatByConclusion(t *testing.T) {
 	}
 	for _, c := range cases {
 		got := buildRunMessage(mk(c.concl))
-		if !strings.HasPrefix(got, c.icon+" CI "+c.verb+" — o/r") {
+		if !strings.HasPrefix(got, c.icon+" CI "+c.verb+"\n📦 o/r") {
 			t.Fatalf("conclusion %q: got %q", c.concl, got)
 		}
-		if !strings.Contains(got, "run #7 · main · @alice") || !strings.Contains(got, "https://x/runs/1") {
-			t.Fatalf("conclusion %q body: %q", c.concl, got)
+		for _, want := range []string{"🔢 run #7", "🌿 main", "👤 @alice", "🔗 https://x/runs/1"} {
+			if !strings.Contains(got, want) {
+				t.Fatalf("conclusion %q missing %q in: %q", c.concl, want, got)
+			}
 		}
 	}
 }
@@ -811,7 +813,7 @@ func TestBuildRunMessage_Enriched(t *testing.T) {
 	ev.Repository.FullName = "acme/app"
 
 	got := buildRunMessage(ev)
-	want := "✅ deploy passed — acme/app\nfix: bump to v1.2.3\nrun #42 · v1.2.3 · push · @bob\nhttps://x/runs/9"
+	want := "✅ deploy passed\n📦 acme/app\n\n📝 fix: bump to v1.2.3\n\n🔢 run #42\n🌿 v1.2.3\n⚡ push\n👤 @bob\n\n🔗 https://x/runs/9"
 	if got != want {
 		t.Fatalf("enriched message mismatch:\n got: %q\nwant: %q", got, want)
 	}
@@ -830,7 +832,7 @@ func TestBuildRunMessage_DropsTitleEqualToWorkflowName(t *testing.T) {
 	ev.Sender.Login = "alice"
 
 	got := buildRunMessage(ev)
-	want := "✅ pipeline-3jobs passed — o/r\nrun #3 · main · workflow_dispatch · @alice\nhttps://x/runs/3"
+	want := "✅ pipeline-3jobs passed\n📦 o/r\n\n🔢 run #3\n🌿 main\n⚡ workflow_dispatch\n👤 @alice\n\n🔗 https://x/runs/3"
 	if got != want {
 		t.Fatalf("redundant title not dropped:\n got: %q\nwant: %q", got, want)
 	}
@@ -846,7 +848,7 @@ func TestBuildRunMessage_TitleFallbackToCommit(t *testing.T) {
 	ev.Sender.Login = "carol"
 
 	got := buildRunMessage(ev)
-	if !strings.Contains(got, "\nfirst line of commit\n") {
+	if !strings.Contains(got, "📝 first line of commit") {
 		t.Fatalf("expected commit first line as title, got %q", got)
 	}
 	if strings.Contains(got, "body paragraph") {

@@ -541,36 +541,39 @@ func buildRunMessage(ev *workflowRunEvent) string {
 	actor := firstNonEmpty(run.TriggeringActor.Login, run.Actor.Login, ev.Sender.Login)
 	// A short human title for the run: GitHub's display_title (commit subject
 	// for pushes, PR title for PRs) or, failing that, the commit's first line.
+	// GitHub sets display_title to the workflow name for runs with no commit
+	// subject (workflow_dispatch, schedule); drop it then so it doesn't just
+	// duplicate the header. A real push shows the commit subject instead.
+	// Only the head (latest) commit is available in the workflow_run payload.
 	title := firstNonEmpty(run.DisplayTitle, firstLine(run.HeadCommit.Message))
-
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s %s %s — %s", icon, run.Name, verb, ev.Repository.FullName)
-	// Skip the title line when it adds nothing: GitHub sets display_title to
-	// the workflow name for runs with no commit subject (workflow_dispatch,
-	// schedule), which would just duplicate line 1. A real push shows the
-	// commit subject here instead.
-	if title != "" && !strings.EqualFold(title, run.Name) {
-		b.WriteString("\n")
-		b.WriteString(title)
+	if strings.EqualFold(title, run.Name) {
+		title = ""
 	}
-	// Meta line: run number, ref (branch or tag), trigger event, actor —
-	// empty pieces are dropped so the line stays clean. HeadBranch carries the
-	// tag name for tag builds, so a tag push shows e.g. "v1.2.3" here.
-	meta := []string{fmt.Sprintf("run #%d", run.RunNumber)}
+
+	// One field per line with an emoji label; blank lines set off the commit
+	// subject and the link. Empty fields are dropped so the message stays tidy.
+	var lines []string
+	lines = append(lines,
+		fmt.Sprintf("%s %s %s", icon, run.Name, verb),
+		"📦 "+ev.Repository.FullName,
+	)
+	if title != "" {
+		lines = append(lines, "", "📝 "+title)
+	}
+	lines = append(lines, "", fmt.Sprintf("🔢 run #%d", run.RunNumber))
 	if run.HeadBranch != "" {
-		meta = append(meta, run.HeadBranch)
+		lines = append(lines, "🌿 "+run.HeadBranch)
 	}
 	if run.Event != "" {
-		meta = append(meta, run.Event)
+		lines = append(lines, "⚡ "+run.Event)
 	}
 	if actor != "" {
-		meta = append(meta, "@"+actor)
+		lines = append(lines, "👤 @"+actor)
 	}
-	b.WriteString("\n")
-	b.WriteString(strings.Join(meta, " · "))
-	b.WriteString("\n")
-	b.WriteString(run.HTMLURL)
-	return b.String()
+	if run.HTMLURL != "" {
+		lines = append(lines, "", "🔗 "+run.HTMLURL)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // firstNonEmpty returns the first non-empty string, or "" if all are empty.
