@@ -1426,6 +1426,8 @@ func (e *errStore) UpdateRunnerStatus(context.Context, string, string) error {
 func (e *errStore) UpdateRunnerStatusByName(context.Context, string, string) error {
 	panic("unused")
 }
-func (e *errStore) ActiveRunnerCount(context.Context) (int, error)             { panic("unused") }
-func (e *errStore) ListActiveRunners(context.Context) ([]*store.Runner, error) { panic("unused") }
-func (e *errStore) Close() error                                               { return nil }
+func (e *errStore) ActiveRunnerCount(context.Context) (int, error)                         { panic("unused") }
+func (e *errStore) ListActiveRunners(context.Context) ([]*store.Runner, error)             { panic("unused") }
+func (e *errStore) GetNotifySettings(context.Context) (*store.NotifySettings, error)       { panic("unused") }
+func (e *errStore) SaveNotifySettings(context.Context, *store.NotifySettings) error        { panic("unused") }
+func (e *errStore) Close() error                                                           { return nil }
