@@ -370,10 +370,12 @@ body.loading .board{display:grid}
   </div>
 
   <!-- read-only banner (shown via body.readonly CSS) -->
+  {{if and (not .AllowAdminEdit) (not .BehindPortal)}}
   <div class="ro-banner" role="note">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-    {{if not .AllowAdminEdit}}<span><b>Admin writes are disabled.</b> Set <code>ALLOW_ADMIN_EDIT=true</code> and provide an admin token to enable retry, cancel &amp; credential rotation.</span>{{end}}
+    <span><b>Admin writes are disabled.</b> Set <code>ALLOW_ADMIN_EDIT=true</code> and provide an admin token to enable retry, cancel &amp; credential rotation.</span>
   </div>
+  {{end}}
 
   <!-- status ribbon -->
   <section class="ribbon" id="ribbon" aria-live="polite">
@@ -529,7 +531,9 @@ body.loading .board{display:grid}
     <button class="dr-close" data-close aria-label="Close">✕</button>
   </div>
   <div class="dr-body">
-    <!-- token form — id="authForm" satisfies Go test -->
+    <!-- token form — id="authForm" satisfies Go test. Hidden behind the portal:
+         the proxy strips client Authorization and injects the slot token. -->
+    {{if not .BehindPortal}}
     <div class="adm-block">
       <h5>Admin token</h5>
       <p>Stored in this browser only (sessionStorage). Sent as <code>Authorization: Bearer</code>.</p>
@@ -545,6 +549,7 @@ body.loading .board{display:grid}
         </div>
       </form>
     </div>
+    {{end}}
 
     <p class="adm-section-head">Notifications</p>
     <div class="adm-block" id="notifyCard">
@@ -641,6 +646,9 @@ body.loading .board{display:grid}
 const $ = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 const tokenKey = 'gharp.adminToken';
+// Behind the portal the reverse proxy injects the slot's admin token, so the
+// manual token UI is hidden and the "token required" prompts are bypassed.
+const BEHIND_PORTAL = {{if .BehindPortal}}true{{else}}false{{end}};
 const allowAdminEdit = {{if .AllowAdminEdit}}true{{else}}false{{end}};
 const POLL_MS = 10000;
 
@@ -966,7 +974,7 @@ function openJob(id){
    ===================================================================== */
 async function mutate(act,id){
   if(!allowAdminEdit){toast('Read-only mode','err');return;}
-  if(!State.token){openDrawer('#adminDrawer');$('#tokenInput').focus();toast('Admin token required','err');return;}
+  if(!BEHIND_PORTAL && !State.token){openDrawer('#adminDrawer');$('#tokenInput').focus();toast('Admin token required','err');return;}
   try{
     const r=await fetch(`jobs/${id}/${act}`,{method:'POST',headers:{Authorization:'Bearer '+State.token}});
     if(!r.ok)throw{status:r.status};
@@ -1033,30 +1041,34 @@ function setTheme(t){
 $('#themeBtn').addEventListener('click',()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
 (function initTheme(){const saved=localStorage.getItem('gharp_theme');const sys=matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';setTheme(saved||sys);})();
 
-/* authForm / token — satisfies Go tests: id="authForm", authForm.addEventListener("submit" */
-$('#tokenInput').value=State.token;
-$('#tokenState').textContent=State.token?'token set':'no token';
-const authForm=document.getElementById('authForm');
-authForm.addEventListener("submit",function(e){
-  e.preventDefault();
-  const v=$('#tokenInput').value.trim();
-  State.token=v;
-  if(v)sessionStorage.setItem(tokenKey,v);else sessionStorage.removeItem(tokenKey);
-  $('#tokenState').textContent=v?'token set':'no token';
-  toast('Token saved','ok');
-});
-$('#clearTokenButton').addEventListener('click',()=>{
-  State.token='';$('#tokenInput').value='';
-  sessionStorage.removeItem(tokenKey);
-  $('#tokenState').textContent='no token';
-  toast('Token cleared','ok');
-});
+/* authForm / token — satisfies Go tests: id="authForm", authForm.addEventListener("submit".
+   Skipped behind the portal: the token form isn't rendered (proxy injects the token),
+   so these elements don't exist and wiring them would throw. */
+if(!BEHIND_PORTAL){
+  $('#tokenInput').value=State.token;
+  $('#tokenState').textContent=State.token?'token set':'no token';
+  const authForm=document.getElementById('authForm');
+  authForm.addEventListener("submit",function(e){
+    e.preventDefault();
+    const v=$('#tokenInput').value.trim();
+    State.token=v;
+    if(v)sessionStorage.setItem(tokenKey,v);else sessionStorage.removeItem(tokenKey);
+    $('#tokenState').textContent=v?'token set':'no token';
+    toast('Token saved','ok');
+  });
+  $('#clearTokenButton').addEventListener('click',()=>{
+    State.token='';$('#tokenInput').value='';
+    sessionStorage.removeItem(tokenKey);
+    $('#tokenState').textContent='no token';
+    toast('Token cleared','ok');
+  });
+}
 
 /* credential rotation — PATCH /admin/app-config */
 $$('#rotateBlocks [data-rotate]').forEach(block=>{
   const btn=block.querySelector('button'),inp=block.querySelector('input'),fp=block.querySelector('.fp-out');
   btn.addEventListener('click',async()=>{
-    if(!State.token){toast('Admin token required','err');$('#tokenInput').focus();return;}
+    if(!BEHIND_PORTAL && !State.token){toast('Admin token required','err');$('#tokenInput').focus();return;}
     if(!inp.value.trim()){toast('Enter a value','err');return;}
     try{
       const r=await fetch('admin/app-config',{method:'PATCH',

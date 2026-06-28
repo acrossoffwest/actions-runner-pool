@@ -100,3 +100,28 @@ func TestDashboard_NoBannerWhenFlagOn(t *testing.T) {
 		t.Fatal("JS allowAdminEdit flag should be true")
 	}
 }
+
+// Behind the portal the reverse proxy injects the slot's admin token, so the
+// manual token form and the admin-writes banner are meaningless and must not
+// render — even when AllowAdminEdit is false (gharp isn't reachable directly).
+func TestDashboard_BehindPortalHidesTokenUI(t *testing.T) {
+	h := &DashboardHandler{Cfg: &config.Config{BehindPortal: true, AllowAdminEdit: false}}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	h.Get(rr, req)
+
+	body := rr.Body.String()
+	if strings.Contains(body, `id="authForm"`) {
+		t.Fatal("token form must be hidden behind the portal")
+	}
+	if strings.Contains(body, `id="tokenInput"`) {
+		t.Fatal("token input must be hidden behind the portal")
+	}
+	if strings.Contains(body, "Admin writes are disabled") {
+		t.Fatal("admin-writes banner must be hidden behind the portal")
+	}
+	if !strings.Contains(body, "const BEHIND_PORTAL = true") {
+		t.Fatal("JS BEHIND_PORTAL flag should be true")
+	}
+}

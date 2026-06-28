@@ -109,6 +109,9 @@ Environment=ALLOW_PUBLIC_REPOS=false
 # proxy enforces ownership + injects this instance's ADMIN_TOKEN as the bearer,
 # so "admin" here means the slot owner managing their own pool.
 Environment=ALLOW_ADMIN_EDIT=true
+# This instance runs behind the gharp-portal proxy (which injects the admin
+# token), so the dashboard hides its manual token entry + admin-writes banner.
+Environment=BEHIND_PORTAL=true
 Environment=MAX_CONCURRENT_RUNNERS=${GHARP_MAX_RUNNERS}
 Environment=PORT=${PORT}
 Environment=STORE_DSN=file:/home/${OS_USER}/gharp.db

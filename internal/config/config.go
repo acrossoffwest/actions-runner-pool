@@ -66,7 +66,15 @@ type Config struct {
 	// ADMIN_TOKEN lets an operator grant read-only API access
 	// without also handing over the ability to mutate state.
 	AllowAdminEdit bool
-	RepoAllowlist  []string
+	// BehindPortal indicates this gharp instance runs behind the
+	// gharp-portal reverse proxy, which strips client Authorization and
+	// injects the slot's ADMIN_TOKEN server-side. When true, the
+	// dashboard hides the manual "Admin token" entry and the
+	// admin-writes-disabled banner — both are meaningless to a tenant
+	// reaching gharp only through the portal. Corresponds to env
+	// BEHIND_PORTAL. Standalone deployments leave it false.
+	BehindPortal  bool
+	RepoAllowlist []string
 	// RepoAllowlistSet is the precomputed lower-cased + trimmed set of
 	// public repositories allowed even when AllowPublicRepos is false.
 	RepoAllowlistSet     map[string]struct{}
@@ -145,6 +153,7 @@ func Load() (*Config, error) {
 		),
 		AllowPublicRepos: envBool("ALLOW_PUBLIC_REPOS"),
 		AllowAdminEdit:   envBool("ALLOW_ADMIN_EDIT"),
+		BehindPortal:     envBool("BEHIND_PORTAL"),
 		RepoAllowlist:    parseList(os.Getenv("REPO_ALLOWLIST")),
 		LogLevel:         parseLogLevel(envOr("LOG_LEVEL", "info")),
 	}

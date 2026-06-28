@@ -21,6 +21,7 @@ type DashboardHandler struct {
 // rendered HTML stays a pure function of Cfg.
 type dashboardData struct {
 	AllowAdminEdit bool
+	BehindPortal   bool
 }
 
 func (h *DashboardHandler) Get(w http.ResponseWriter, _ *http.Request) {
@@ -28,6 +29,7 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, _ *http.Request) {
 	data := dashboardData{}
 	if h.Cfg != nil {
 		data.AllowAdminEdit = h.Cfg.AllowAdminEdit
+		data.BehindPortal = h.Cfg.BehindPortal
 	}
 	if err := dashboardTmpl.Execute(w, data); err != nil {
 		if h.Log != nil {
