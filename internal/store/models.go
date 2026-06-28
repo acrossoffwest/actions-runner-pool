@@ -11,6 +11,7 @@ type AppConfig struct {
 	ClientID      string
 	ClientSecret  string
 	BaseURL       string
+	OwnerLogin    string
 	CreatedAt     time.Time
 }
 
@@ -23,6 +24,13 @@ type NotifySettings struct {
 	ChatID    string
 	ChatTitle string
 	Mode      string
+}
+
+// AccessSettings holds the per-instance owner allowlist: a comma-separated
+// list of GitHub account/org logins (besides the App owner) whose repos may
+// launch runners on this slot.
+type AccessSettings struct {
+	AllowedOwners string
 }
 
 // Installation represents a GitHub App installation.

@@ -125,15 +125,15 @@ var ErrNoAppConfig = errors.New("app_config row does not exist; run /setup first
 
 func (s *SQLite) SaveAppConfig(ctx context.Context, cfg *AppConfig) error {
 	const q = `
-INSERT INTO app_config (id, app_id, slug, webhook_secret, pem, client_id, client_secret, base_url)
-VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO app_config (id, app_id, slug, webhook_secret, pem, client_id, client_secret, base_url, owner_login)
+VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
   app_id=excluded.app_id, slug=excluded.slug, webhook_secret=excluded.webhook_secret,
   pem=excluded.pem, client_id=excluded.client_id, client_secret=excluded.client_secret,
-  base_url=excluded.base_url`
+  base_url=excluded.base_url, owner_login=excluded.owner_login`
 	_, err := s.db.ExecContext(ctx, q,
 		cfg.AppID, cfg.Slug, cfg.WebhookSecret, cfg.PEM,
-		cfg.ClientID, cfg.ClientSecret, cfg.BaseURL)
+		cfg.ClientID, cfg.ClientSecret, cfg.BaseURL, cfg.OwnerLogin)
 	return err
 }
 
@@ -155,6 +155,11 @@ func (s *SQLite) UpdateAppConfigPEM(ctx context.Context, pem []byte) error {
 // See UpdateAppConfigWebhookSecret for the concurrency rationale.
 func (s *SQLite) UpdateAppConfigClientSecret(ctx context.Context, secret string) error {
 	return s.updateAppConfigField(ctx, "client_secret", secret)
+}
+
+// UpdateAppOwnerLogin writes only the owner_login column.
+func (s *SQLite) UpdateAppOwnerLogin(ctx context.Context, login string) error {
+	return s.updateAppConfigField(ctx, "owner_login", login)
 }
 
 // updateAppConfigField builds the parameterised UPDATE. `col` is a
@@ -180,12 +185,12 @@ func (s *SQLite) updateAppConfigField(ctx context.Context, col string, value any
 }
 
 func (s *SQLite) GetAppConfig(ctx context.Context) (*AppConfig, error) {
-	const q = `SELECT app_id, slug, webhook_secret, pem, client_id, client_secret, base_url, created_at
+	const q = `SELECT app_id, slug, webhook_secret, pem, client_id, client_secret, base_url, owner_login, created_at
 		FROM app_config WHERE id = 1`
 	var c AppConfig
 	err := s.db.QueryRowContext(ctx, q).Scan(
 		&c.AppID, &c.Slug, &c.WebhookSecret, &c.PEM,
-		&c.ClientID, &c.ClientSecret, &c.BaseURL, &c.CreatedAt)
+		&c.ClientID, &c.ClientSecret, &c.BaseURL, &c.OwnerLogin, &c.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -644,5 +649,26 @@ ON CONFLICT(id) DO UPDATE SET
 		enabled = 1
 	}
 	_, err := s.db.ExecContext(ctx, q, enabled, n.BotToken, n.ChatID, n.ChatTitle, n.Mode)
+	return err
+}
+
+func (s *SQLite) GetAccessSettings(ctx context.Context) (*AccessSettings, error) {
+	const q = `SELECT allowed_owners FROM access_settings WHERE id = 1`
+	var a AccessSettings
+	err := s.db.QueryRowContext(ctx, q).Scan(&a.AllowedOwners)
+	if errors.Is(err, sql.ErrNoRows) {
+		return &AccessSettings{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+func (s *SQLite) SaveAccessSettings(ctx context.Context, a *AccessSettings) error {
+	const q = `
+INSERT INTO access_settings (id, allowed_owners) VALUES (1, ?)
+ON CONFLICT(id) DO UPDATE SET allowed_owners=excluded.allowed_owners`
+	_, err := s.db.ExecContext(ctx, q, a.AllowedOwners)
 	return err
 }

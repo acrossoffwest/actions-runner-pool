@@ -22,6 +22,14 @@ type Store interface {
 	// SaveNotifySettings upserts the single-row (id=1) notification config.
 	SaveNotifySettings(ctx context.Context, n *NotifySettings) error
 
+	// UpdateAppOwnerLogin writes only the app_config.owner_login column.
+	UpdateAppOwnerLogin(ctx context.Context, login string) error
+	// GetAccessSettings returns the single-row owner allowlist; never nil
+	// (absent row yields an empty list).
+	GetAccessSettings(ctx context.Context) (*AccessSettings, error)
+	// SaveAccessSettings upserts the single-row (id=1) owner allowlist.
+	SaveAccessSettings(ctx context.Context, a *AccessSettings) error
+
 	UpsertInstallation(ctx context.Context, inst *Installation) error
 	ListInstallations(ctx context.Context) ([]*Installation, error)
 
