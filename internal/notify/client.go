@@ -80,7 +80,7 @@ func (c *Client) SendMessage(ctx context.Context, token, chatID, text string) er
 	url := c.BaseURL + "/bot" + token + "/sendMessage"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
-		return err
+		return redactToken(err, token)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.HTTP.Do(req)
@@ -106,7 +106,7 @@ func (c *Client) GetUpdates(ctx context.Context, token string) ([]Update, error)
 	url := c.BaseURL + "/bot" + token + "/getUpdates"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, redactToken(err, token)
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {

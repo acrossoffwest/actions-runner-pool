@@ -547,12 +547,12 @@ body.loading .board{display:grid}
         <input class="txt" id="ntToken" type="password" placeholder="123456:ABC-..." autocomplete="off">
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
-        <button class="iconbtn" id="ntSaveToken" type="button" style="height:36px">Save token</button>
+        <button class="iconbtn" id="ntSaveToken" type="button"{{if not .AllowAdminEdit}} disabled{{end}} style="height:36px">Save token</button>
         <span id="ntTokenState" class="muted"></span>
       </div>
 
       <div class="ntRow">
-        <button class="iconbtn" id="ntConnect" type="button" style="height:36px">Connect chat</button>
+        <button class="iconbtn" id="ntConnect" type="button"{{if not .AllowAdminEdit}} disabled{{end}} style="height:36px">Connect chat</button>
         <span id="ntChatState" class="muted">Send <code>/start</code> to your bot, then click Connect.</span>
       </div>
 
@@ -569,7 +569,7 @@ body.loading .board{display:grid}
       </label>
 
       <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
-        <button class="iconbtn" id="ntTest" type="button" style="height:36px">Send test</button>
+        <button class="iconbtn" id="ntTest" type="button"{{if not .AllowAdminEdit}} disabled{{end}} style="height:36px">Send test</button>
         <span id="ntTestState" class="muted"></span>
       </div>
     </div>

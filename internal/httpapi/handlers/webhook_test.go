@@ -765,6 +765,36 @@ func TestHandleWorkflowRun_SendError_Still200(t *testing.T) {
 	}
 }
 
+func TestBuildRunMessage_FormatByConclusion(t *testing.T) {
+	mk := func(concl string) *workflowRunEvent {
+		ev := &workflowRunEvent{}
+		ev.Action = "completed"
+		ev.WorkflowRun.Name = "CI"
+		ev.WorkflowRun.Conclusion = concl
+		ev.WorkflowRun.HTMLURL = "https://x/runs/1"
+		ev.WorkflowRun.HeadBranch = "main"
+		ev.WorkflowRun.RunNumber = 7
+		ev.Repository.FullName = "o/r"
+		ev.Sender.Login = "alice"
+		return ev
+	}
+	cases := []struct{ concl, icon, verb string }{
+		{"success", "✅", "passed"},
+		{"failure", "❌", "failed"},
+		{"cancelled", "⚠️", "cancelled"},
+		{"timed_out", "ℹ️", "timed_out"},
+	}
+	for _, c := range cases {
+		got := buildRunMessage(mk(c.concl))
+		if !strings.HasPrefix(got, c.icon+" CI "+c.verb+" — o/r") {
+			t.Fatalf("conclusion %q: got %q", c.concl, got)
+		}
+		if !strings.Contains(got, "run #7 · branch main · @alice") || !strings.Contains(got, "https://x/runs/1") {
+			t.Fatalf("conclusion %q body: %q", c.concl, got)
+		}
+	}
+}
+
 // labelsMatch enforces GitHub's cumulative runs-on semantics: a job is
 // only accepted if every required label can be satisfied by this pool.
 // 'self-hosted' is implicit (GitHub auto-assigns it) so it's always
