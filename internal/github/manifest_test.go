@@ -100,6 +100,19 @@ func TestConvertCode_404Surfaces(t *testing.T) {
 	}
 }
 
+func TestBuildManifest_SubscribesWorkflowRun(t *testing.T) {
+	m := BuildManifest("https://example.test")
+	var hasRun bool
+	for _, e := range m.DefaultEvents {
+		if e == "workflow_run" {
+			hasRun = true
+		}
+	}
+	if !hasRun {
+		t.Fatalf("manifest must subscribe to workflow_run; got %v", m.DefaultEvents)
+	}
+}
+
 func TestConvertCode_EscapesCode(t *testing.T) {
 	var gotPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
