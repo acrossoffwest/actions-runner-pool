@@ -79,6 +79,7 @@ func TestCallback_HappyPath_SavesAndRenders(t *testing.T) {
 	conv := &fakeConverter{creds: &github.AppCredentials{
 		AppID: 42, Slug: "gharp-test", WebhookSecret: "shh",
 		PEM: []byte("PEM"), ClientID: "Iv1.x", ClientSecret: "sec",
+		OwnerLogin: "acrossoffwest",
 	}}
 	h := newCallbackHandler(t, st, conv)
 	rr := doCallback(t, h, "the-code", "match", "match")
@@ -94,6 +95,9 @@ func TestCallback_HappyPath_SavesAndRenders(t *testing.T) {
 	}
 	if st.saved.BaseURL != "https://example.test" {
 		t.Errorf("BaseURL not stamped from cfg, got %q", st.saved.BaseURL)
+	}
+	if st.saved.OwnerLogin != "acrossoffwest" {
+		t.Errorf("OwnerLogin = %q, want %q", st.saved.OwnerLogin, "acrossoffwest")
 	}
 	if !strings.Contains(rr.Body.String(), "/apps/gharp-test/installations/new") {
 		t.Errorf("install link missing; body=%s", rr.Body.String())

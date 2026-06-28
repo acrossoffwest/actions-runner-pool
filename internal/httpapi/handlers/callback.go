@@ -66,6 +66,7 @@ func (h *CallbackHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ClientID:      creds.ClientID,
 		ClientSecret:  creds.ClientSecret,
 		BaseURL:       h.Cfg.BaseURL,
+		OwnerLogin:    creds.OwnerLogin,
 	}); err != nil {
 		h.logError("persist app config", err)
 		http.Error(w, "failed to persist app config", http.StatusInternalServerError)
