@@ -1173,7 +1173,8 @@ async function acLoad(){
     document.getElementById('acOwners').value = (v.allowed_owners||[]).join('\n');
   }catch(e){/* leave defaults */}
 }
-document.getElementById('acSave').addEventListener('click', async ()=>{
+document.getElementById('acSave')?.addEventListener('click', async ()=>{
+    const st = document.getElementById('acState'); if(st) st.textContent='';
   const raw = document.getElementById('acOwners').value;
   const owners = raw.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
   try{
