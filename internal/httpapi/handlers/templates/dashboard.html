@@ -280,6 +280,11 @@ body.loading .board{display:grid}
 .nt-guide li{margin:4px 0}
 .nt-guide code{font-size:11px;background:var(--surface-2);padding:1px 4px;border-radius:3px}
 .nt-guide .nt-note{margin:8px 0 0;font-size:11px;color:var(--text-dim);opacity:.85}
+.adv-section{margin-top:6px}
+.adv-section>summary{cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);user-select:none;list-style:none;padding:6px 0}
+.adv-section>summary::-webkit-details-marker{display:none}
+.adv-section>summary::before{content:"▸ ";color:var(--text-faint)}
+.adv-section[open]>summary::before{content:"▾ "}
 .inrow{display:flex;flex-direction:column;gap:8px}
 .inrow label{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-faint)}
 .txt{height:38px;background:var(--surface);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--text);
@@ -605,8 +610,9 @@ body.loading .board{display:grid}
       </div>
     </div>
 
-    <!-- Rotate credentials -->
-    <p class="adm-section-head">Rotate credentials</p>
+    <!-- Rotate credentials (advanced; collapsed by default) -->
+    <details class="adv-section">
+    <summary>Advanced · Rotate credentials</summary>
     <div id="rotateBlocks">
       <div class="adm-block" data-rotate="webhook_secret">
         <h5>Rotate webhook secret</h5>
@@ -635,6 +641,7 @@ body.loading .board{display:grid}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
       <span>Calls <code>PATCH /admin/app-config</code>. Secrets are never echoed — only the <code>sha256:</code> fingerprint is returned.</span>
     </div>
+    </details>
   </div>
 </aside>
 
