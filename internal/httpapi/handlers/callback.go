@@ -72,11 +72,11 @@ func (h *CallbackHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clear the state cookie — single-use.
+	// Clear the state cookie — single-use. Path must match the one set in setup.
 	http.SetCookie(w, &http.Cookie{
 		Name:     stateCookie,
 		Value:    "",
-		Path:     "/github/app/callback",
+		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   strings.HasPrefix(h.Cfg.BaseURL, "https://"),

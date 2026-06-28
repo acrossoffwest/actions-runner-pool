@@ -189,8 +189,8 @@ func TestSetup_FreshInstall_RendersForm(t *testing.T) {
 	if stateCk.MaxAge != int(stateCookieTTL.Seconds()) {
 		t.Errorf("state cookie MaxAge = %d, want %d", stateCk.MaxAge, int(stateCookieTTL.Seconds()))
 	}
-	if stateCk.Path != "/github/app/callback" {
-		t.Errorf("state cookie Path = %q, want /github/app/callback", stateCk.Path)
+	if stateCk.Path != "/" {
+		t.Errorf("state cookie Path = %q, want /", stateCk.Path)
 	}
 	if stateCk.Value == "" || len(stateCk.Value) < 16 {
 		t.Errorf("state cookie value too short: %q", stateCk.Value)
