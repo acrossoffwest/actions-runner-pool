@@ -51,7 +51,54 @@ func OpenSQLiteWithContext(ctx context.Context, dsn string) (*SQLite, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
+	if err := migrateAddColumns(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
 	return &SQLite{db: db}, nil
+}
+
+// migrateAddColumns adds columns introduced after a database was first created.
+// schema.sql uses CREATE TABLE IF NOT EXISTS, which is a no-op on an existing
+// table and therefore never adds new columns to it. SQLite has no
+// "ADD COLUMN IF NOT EXISTS", so each additive column needs an explicit,
+// idempotent ALTER guarded by a PRAGMA table_info check.
+func migrateAddColumns(ctx context.Context, db *sql.DB) error {
+	additions := []struct{ table, column, ddl string }{
+		{"app_config", "owner_login", "ALTER TABLE app_config ADD COLUMN owner_login TEXT NOT NULL DEFAULT ''"},
+	}
+	for _, a := range additions {
+		has, err := columnExists(ctx, db, a.table, a.column)
+		if err != nil {
+			return err
+		}
+		if has {
+			continue
+		}
+		if _, err := db.ExecContext(ctx, a.ddl); err != nil {
+			return fmt.Errorf("add %s.%s: %w", a.table, a.column, err)
+		}
+	}
+	return nil
+}
+
+// columnExists reports whether table has a column of the given name.
+func columnExists(ctx context.Context, db *sql.DB, table, column string) (bool, error) {
+	rows, err := db.QueryContext(ctx, "SELECT name FROM pragma_table_info(?)", table)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return false, err
+		}
+		if name == column {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 // ensureDSNPragma adds `_pragma=name(value)` to a modernc.org/sqlite DSN if

@@ -2,9 +2,56 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 )
+
+// TestMigrate_AddsOwnerLoginToExistingDB simulates a database created before the
+// owner_login column existed (schema.sql's CREATE TABLE IF NOT EXISTS would NOT
+// add it) and verifies the additive migration adds it so GetAppConfig works.
+func TestMigrate_AddsOwnerLoginToExistingDB(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/old.db"
+	dsn := "file:" + path
+
+	raw, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := raw.Exec(`CREATE TABLE app_config (
+		id INTEGER PRIMARY KEY CHECK (id = 1), app_id INTEGER NOT NULL, slug TEXT NOT NULL,
+		webhook_secret TEXT NOT NULL, pem BLOB NOT NULL, client_id TEXT NOT NULL,
+		client_secret TEXT NOT NULL DEFAULT '', base_url TEXT NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := raw.Exec(`INSERT INTO app_config (id, app_id, slug, webhook_secret, pem, client_id, base_url)
+		VALUES (1, 5, 'sl', 'wsecretwsecret16', 'p', 'cid', 'https://x')`); err != nil {
+		t.Fatal(err)
+	}
+	_ = raw.Close()
+
+	// Opening with the migrating store must add owner_login and read fine.
+	s, err := OpenSQLite(dsn)
+	if err != nil {
+		t.Fatalf("open (migrate): %v", err)
+	}
+	defer s.Close()
+	cfg, err := s.GetAppConfig(context.Background())
+	if err != nil {
+		t.Fatalf("GetAppConfig after migrate: %v", err)
+	}
+	if cfg == nil || cfg.AppID != 5 || cfg.OwnerLogin != "" {
+		t.Fatalf("migrated config wrong: %+v", cfg)
+	}
+	// Idempotent: a second open over the now-migrated DB must not error.
+	s2, err := OpenSQLite(dsn)
+	if err != nil {
+		t.Fatalf("re-open (idempotent migrate): %v", err)
+	}
+	_ = s2.Close()
+}
 
 func newStore(t *testing.T) *SQLite {
 	t.Helper()
