@@ -1,7 +1,7 @@
-import { test, expect, Route } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
-// Fixtures / helpers
+// Fixtures
 // ---------------------------------------------------------------------------
 
 const STATS_EMPTY = {
@@ -27,7 +27,7 @@ const JOBS_TWO = {
       id: 1,
       repo: "org/repo-a",
       job_name: "build",
-      workflow: "CI",
+      workflow_name: "CI",
       status: "in_progress",
       runner_name: "runner-abc",
       updated_at: new Date().toISOString(),
@@ -36,7 +36,7 @@ const JOBS_TWO = {
       id: 2,
       repo: "org/repo-b",
       job_name: "lint",
-      workflow: "Lint",
+      workflow_name: "Lint",
       status: "pending",
       runner_name: "",
       updated_at: new Date().toISOString(),
@@ -50,7 +50,7 @@ const JOBS_WITH_COMPLETED = {
       id: 1,
       repo: "org/repo-a",
       job_name: "build",
-      workflow: "CI",
+      workflow_name: "CI",
       status: "completed",
       conclusion: "success",
       runner_name: "runner-abc",
@@ -59,20 +59,21 @@ const JOBS_WITH_COMPLETED = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 async function mockApis(
-  route: Route,
+  page: import("@playwright/test").Page,
   stats = STATS_EMPTY,
   jobs = JOBS_EMPTY
-): Promise<void> {
-  // Each call handles a single route; callers wire this up with page.route.
-  const url = route.request().url();
-  if (url.includes("/stats")) {
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify(stats) });
-  } else if (url.includes("/jobs")) {
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify(jobs) });
-  } else {
-    await route.continue();
-  }
+) {
+  await page.route("**/stats", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(stats) })
+  );
+  await page.route("**/jobs**", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(jobs) })
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -80,158 +81,99 @@ async function mockApis(
 // ---------------------------------------------------------------------------
 
 test.beforeEach(async ({ page }) => {
-  // Clear sessionStorage between tests so token state doesn't leak.
   await page.addInitScript(() => sessionStorage.clear());
 });
 
 test("renders page shell with required elements", async ({ page }) => {
-  await page.route("**/stats", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_EMPTY) }));
-  await page.route("**/jobs**", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_EMPTY) }));
-
+  await mockApis(page);
   await page.goto("/");
 
   await expect(page.locator("#app")).toBeVisible();
+  // authForm lives inside admin drawer (always in DOM)
   await expect(page.locator("#authForm")).toBeAttached();
   await expect(page.locator(".stats")).toBeVisible();
+  // DevServer has AllowAdminEdit=true → sr-only table with 6 th is rendered
   await expect(page.locator("thead tr th")).toHaveCount(6);
-  await expect(page.locator("#capacityFill")).toBeVisible();
+  // Capacity bar element is in DOM
+  await expect(page.locator("#cap_bar")).toBeAttached();
 });
 
 test("stat tiles update from /stats response", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_BUSY) })
-  );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_EMPTY) })
-  );
-
+  await mockApis(page, STATS_BUSY);
   await page.goto("/");
 
-  await expect(page.locator("#statPending")).toHaveText("2");
-  await expect(page.locator("#statDispatched")).toHaveText("1");
-  await expect(page.locator("#statInProgress")).toHaveText("3");
-  await expect(page.locator("#statCompleted")).toHaveText("17");
-  await expect(page.locator("#statActive")).toHaveText("8");
-  await expect(page.locator("#statAvailable")).toHaveText("2");
+  await expect(page.locator("#s_in_progress")).toHaveText("3");
+  await expect(page.locator("#s_pending")).toHaveText("2");
+  await expect(page.locator("#s_dispatched")).toHaveText("1");
+  await expect(page.locator("#s_completed")).toHaveText("17");
+  await expect(page.locator("#cap_active")).toHaveText("8");
+  await expect(page.locator("#cap_slots")).toHaveText("2");
 });
 
-test("renders job rows from /jobs response", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_EMPTY) })
-  );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_TWO) })
-  );
-
+test("renders job cards from /jobs response", async ({ page }) => {
+  await mockApis(page, STATS_EMPTY, JOBS_TWO);
   await page.goto("/");
 
-  const rows = page.locator("#jobsBody tr");
-  await expect(rows).toHaveCount(2);
+  const cards = page.locator(".board .card[data-card]");
+  await expect(cards).toHaveCount(2);
   await expect(page.locator("#tableCount")).toHaveText("2 jobs");
-  await expect(page.locator("#emptyState")).toBeHidden();
+  await expect(page.locator("#emptyJobs")).toBeHidden();
 
-  // Verify badge classes exist for the two statuses.
-  await expect(rows.nth(0).locator(".badge.in_progress")).toBeVisible();
-  await expect(rows.nth(1).locator(".badge.pending")).toBeVisible();
+  // Both status badges present
+  await expect(page.locator(".s-in_progress").first()).toBeVisible();
+  await expect(page.locator(".s-pending").first()).toBeVisible();
 });
 
 test("empty state shown when /jobs returns no results", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_EMPTY) })
-  );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_EMPTY) })
-  );
-
+  await mockApis(page);
   await page.goto("/");
 
-  await expect(page.locator("#emptyState")).toBeVisible();
-  await expect(page.locator("#jobsBody tr")).toHaveCount(0);
+  await expect(page.locator("#emptyJobs")).toBeVisible();
+  await expect(page.locator(".board .card[data-card]")).toHaveCount(0);
   await expect(page.locator("#tableCount")).toHaveText("0 jobs");
 });
 
-test("filtering by status sends correct query params", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_EMPTY) })
-  );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_EMPTY) })
-  );
-
+test("filtering by status hides non-matching cards", async ({ page }) => {
+  await mockApis(page, STATS_EMPTY, JOBS_TWO);
   await page.goto("/");
 
-  // A checkbox change triggers refresh automatically, so wait for the first
-  // request that already includes both selected statuses.
-  const jobsRequest = page.waitForRequest((req) => {
-    const url = req.url();
-    return url.includes("/jobs") && url.includes("status=pending") && url.includes("status=in_progress");
-  });
+  // Wait for both cards
+  await expect(page.locator(".board .card[data-card]")).toHaveCount(2);
 
-  // Check "pending" checkbox.
+  // Filter to pending only — in_progress card disappears
   await page.locator('input[name=status][value=pending]').check();
-  // Check "in_progress" checkbox.
-  await page.locator('input[name=status][value=in_progress]').check();
-  await expect(page.locator('input[name=status][value=pending]')).toBeChecked();
-  await expect(page.locator('input[name=status][value=in_progress]')).toBeChecked();
-  // Click Apply to trigger the request.
-  await page.locator("#applyFiltersButton").click();
-
-  const req = await jobsRequest;
-  const url = new URL(req.url());
-  const statuses = url.searchParams.getAll("status");
-  expect(statuses.length).toBeGreaterThan(0);
-  expect(statuses).toContain("pending");
-  expect(statuses).toContain("in_progress");
+  await expect(page.locator(".board .card[data-card]")).toHaveCount(1);
+  await expect(page.locator(".board .card .s-pending")).toBeVisible();
+  await expect(page.locator(".board .card .s-in_progress")).toHaveCount(0);
 });
 
-test("filtering by repo sends correct query params", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_EMPTY) })
-  );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_EMPTY) })
-  );
-
+test("filtering by repo narrows visible cards", async ({ page }) => {
+  await mockApis(page, STATS_EMPTY, JOBS_TWO);
   await page.goto("/");
 
-  const jobsRequest = page.waitForRequest((req) => req.url().includes("/jobs") && req.url().includes("repo="));
+  await expect(page.locator(".board .card[data-card]")).toHaveCount(2);
 
-  await page.locator("#repoInput").fill("myorg/myrepo");
-  await page.locator("#applyFiltersButton").click();
-
-  const req = await jobsRequest;
-  const url = new URL(req.url());
-  expect(url.searchParams.get("repo")).toBe("myorg/myrepo");
+  // Type in repo filter — client-side, no new request needed
+  await page.locator("#repoFilter").fill("repo-a");
+  await page.locator("#repoFilter").dispatchEvent("input");
+  await expect(page.locator(".board .card[data-card]")).toHaveCount(1);
 });
 
-test("token panel toggles on Token button click", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_EMPTY) })
-  );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_EMPTY) })
-  );
-
+test("admin drawer opens on Admin button click", async ({ page }) => {
+  await mockApis(page);
   await page.goto("/");
 
-  // Auth panel starts hidden.
-  await expect(page.locator("#authPanel")).toBeHidden();
-
-  await page.locator("#tokenButton").click();
-  await expect(page.locator("#authPanel")).toBeVisible();
+  await expect(page.locator("#adminDrawer")).toHaveAttribute("aria-hidden", "true");
+  await page.locator("#adminBtn").click();
+  await expect(page.locator("#adminDrawer")).toHaveAttribute("aria-hidden", "false");
+  await expect(page.locator("#authForm")).toBeVisible();
 });
 
 test("saves token to sessionStorage on form submit", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_EMPTY) })
-  );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_EMPTY) })
-  );
-
+  await mockApis(page);
   await page.goto("/");
 
-  await page.locator("#tokenButton").click();
+  await page.locator("#adminBtn").click();
   await page.locator("#tokenInput").fill("my-secret-token");
   await page.locator("#saveTokenButton").click();
 
@@ -242,22 +184,12 @@ test("saves token to sessionStorage on form submit", async ({ page }) => {
 });
 
 test("clear token button removes token from sessionStorage", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_EMPTY) })
-  );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_EMPTY) })
-  );
-
+  await mockApis(page);
   await page.goto("/");
 
-  // Plant a token first via the form.
-  await page.locator("#tokenButton").click();
+  await page.locator("#adminBtn").click();
   await page.locator("#tokenInput").fill("to-be-cleared");
   await page.locator("#saveTokenButton").click();
-
-  // Now clear it.
-  await page.locator("#tokenButton").click();
   await page.locator("#clearTokenButton").click();
 
   const stored = await page.evaluate(() =>
@@ -267,75 +199,60 @@ test("clear token button removes token from sessionStorage", async ({ page }) =>
 });
 
 test("retry button calls POST /jobs/:id/retry", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_EMPTY) })
+  // Token required by mutate()
+  await page.addInitScript(() =>
+    sessionStorage.setItem("gharp.adminToken", "test-token")
   );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_WITH_COMPLETED) })
-  );
+  await mockApis(page, STATS_EMPTY, JOBS_WITH_COMPLETED);
 
   let retryCalled = false;
   await page.route("**/jobs/1/retry", (r) => {
     retryCalled = true;
-    r.fulfill({ status: 200, body: "" });
+    r.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
 
   await page.goto("/");
-
-  // Wait for the table to populate, then click the Retry button in the first row.
-  await expect(page.locator("#jobsBody tr")).not.toHaveCount(0);
-  await page.getByRole("button", { name: /retry/i }).first().click();
+  await expect(page.locator(".board .card[data-card]")).not.toHaveCount(0);
+  const retryReq = page.waitForRequest("**/jobs/1/retry");
+  await page.locator('[data-act="retry"]').first().click();
+  await retryReq;
   expect(retryCalled).toBe(true);
 });
 
 test("cancel button calls POST /jobs/:id/cancel", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_EMPTY) })
+  await page.addInitScript(() =>
+    sessionStorage.setItem("gharp.adminToken", "test-token")
   );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_TWO) })
-  );
+  await mockApis(page, STATS_EMPTY, JOBS_TWO);
 
   let cancelCalled = false;
   await page.route("**/jobs/2/cancel", (r) => {
     cancelCalled = true;
-    r.fulfill({ status: 200, body: "" });
+    r.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
 
   await page.goto("/");
-
-  // Second row (id=2) – cancel.
-  await page.locator("#jobsBody tr").nth(1).locator("button", { hasText: /cancel/i }).click();
+  // Job 2 is pending → Cancel button in its card
+  await expect(page.locator(".card[data-card='2']")).toBeVisible();
+  const cancelReq = page.waitForRequest("**/jobs/2/cancel");
+  await page.locator(".card[data-card='2'] [data-act='cancel']").click();
+  await cancelReq;
   expect(cancelCalled).toBe(true);
 });
 
-test("capacity bar shows warn state at 75%+", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_BUSY) }) // 8/10 = 80%
-  );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_EMPTY) })
-  );
-
+test("capacity bar shows warn state at 80%+", async ({ page }) => {
+  await mockApis(page, STATS_BUSY); // 8/10 = 80%
   await page.goto("/");
-
-  await expect(page.locator("#capacityFill")).toHaveAttribute("data-state", "warn");
+  await expect(page.locator("#cap_bar")).toHaveAttribute("data-state", "warn");
 });
 
 test("capacity bar shows full state at 100%", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_FULL) }) // 10/10 = 100%
-  );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_EMPTY) })
-  );
-
+  await mockApis(page, STATS_FULL); // 10/10 = 100%
   await page.goto("/");
-
-  await expect(page.locator("#capacityFill")).toHaveAttribute("data-state", "full");
+  await expect(page.locator("#cap_bar")).toHaveAttribute("data-state", "full");
 });
 
-test("401 from /stats triggers auth panel", async ({ page }) => {
+test("401 from /stats opens admin drawer", async ({ page }) => {
   await page.route("**/stats", (r) =>
     r.fulfill({ status: 401, body: "Unauthorized" })
   );
@@ -344,11 +261,10 @@ test("401 from /stats triggers auth panel", async ({ page }) => {
   );
 
   await page.goto("/");
-
-  await expect(page.locator("#authPanel")).toBeVisible();
+  await expect(page.locator("#adminDrawer")).toHaveAttribute("aria-hidden", "false");
 });
 
-test("error banner visible on API failure", async ({ page }) => {
+test("error banner visible on API 5xx failure", async ({ page }) => {
   await page.route("**/stats", (r) =>
     r.fulfill({ status: 500, body: "internal error" })
   );
@@ -357,21 +273,11 @@ test("error banner visible on API failure", async ({ page }) => {
   );
 
   await page.goto("/");
-
   await expect(page.locator("#errorBanner")).toBeVisible();
-  await expect(page.locator("#errorBanner")).not.toBeHidden();
 });
 
-test("last updated text shown after refresh", async ({ page }) => {
-  await page.route("**/stats", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(STATS_EMPTY) })
-  );
-  await page.route("**/jobs**", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(JOBS_EMPTY) })
-  );
-
+test("live indicator text updates after successful poll", async ({ page }) => {
+  await mockApis(page);
   await page.goto("/");
-
-  // After initial auto-refresh the text should change from "Not refreshed yet".
-  await expect(page.locator("#lastUpdated")).not.toHaveText("Not refreshed yet");
+  await expect(page.locator("#liveText")).not.toHaveText("connecting…");
 });

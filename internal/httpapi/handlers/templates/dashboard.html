@@ -1,827 +1,1013 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>gharp · Dashboard</title>
-  <link rel="icon" href="https://zany.sh/favicon.svg?emoji=🪉">
-  <link rel="stylesheet" href="/css/pico.green.min.css">
-  <style>
-    /* Tighten Pico's default spacing for a denser admin layout. */
-    :root {
-      --pico-spacing: 0.875rem;
-      --pico-block-spacing-vertical: 1rem;
-      --pico-form-element-spacing-vertical: 0.5rem;
-      --pico-form-element-spacing-horizontal: 0.75rem;
-      --pico-typography-spacing-vertical: 0.75rem;
-    }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>gharp · Runner Pool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪉</text></svg>">
+<link rel="stylesheet" href="css/tokens.css">
+<style>
+/* ---------- shell ---------- */
+.wrap{max-width:var(--maxw);margin:0 auto;padding:18px clamp(14px,3vw,28px) 64px}
 
-    main.container { padding-block: 1.5rem; }
+/* ---------- top bar ---------- */
+.topbar{display:flex;align-items:center;gap:16px;padding:8px 2px 18px}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.brand .logo{font-size:26px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))}
+.brand h1{font-size:18px;font-weight:700;margin:0;letter-spacing:-.02em}
+.brand .sub{color:var(--text-faint);font-size:13px;font-weight:500}
+.topbar .spacer{flex:1}
+.live{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);
+  background:var(--surface);border:1px solid var(--border);padding:6px 11px;border-radius:999px;white-space:nowrap}
+.live .dot{width:8px;height:8px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 0 var(--brand-a30);animation:pulse 2.4s infinite}
+.live.paused .dot{background:var(--text-faint);animation:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--brand-a30)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.iconbtn{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 13px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13.5px;font-weight:600;
+  font-family:inherit;transition:.15s;cursor:pointer}
+.iconbtn:hover{background:var(--hover);border-color:var(--border-2)}
+.iconbtn svg{width:16px;height:16px;flex:none}
+.iconbtn.icononly{width:38px;padding:0;justify-content:center}
+.btn-primary{background:var(--brand);border-color:transparent;color:var(--brand-ink)}
+.btn-primary:hover{background:var(--brand-2)}
+.btn-primary:disabled,.iconbtn:disabled{opacity:.45;cursor:not-allowed}
 
-    /* Header: brand on the left, action buttons on the right. */
-    header > nav .brand { font-size: 1.4rem; font-weight: 700; }
-    header > nav .brand small { color: var(--pico-muted-color); font-weight: 400; margin-left: 0.5rem; }
-    header > nav .last-updated { color: var(--pico-muted-color); font-size: 0.85rem; margin-right: 0.5rem; }
-    header > nav button { margin: 0; }
+/* ---------- banners ---------- */
+.err-banner{display:none;align-items:center;gap:11px;padding:10px 14px;margin:0 2px 16px;border-radius:var(--r-md);
+  background:var(--s-fail-bg);border:1px solid var(--s-fail-bd);color:var(--s-fail-fg);font-size:13.5px}
+.err-banner.show{display:flex}
+.err-banner svg{width:17px;height:17px;flex:none}
+.ro-banner{display:none;align-items:center;gap:11px;padding:10px 14px;margin:0 2px 16px;border-radius:var(--r-md);
+  background:var(--s-fail-bg);border:1px solid var(--s-fail-bd);color:var(--s-fail-fg);font-size:13.5px}
+body.readonly .ro-banner{display:flex}
+.ro-banner svg{width:17px;height:17px;flex:none}
+.ro-banner b{color:var(--text)}
 
-    /* Compact stat tiles. */
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 0.75rem;
-      margin-bottom: var(--pico-block-spacing-vertical);
-    }
-    .stat {
-      margin: 0;
-      padding: 0.875rem 1rem;
-    }
-    .stat .label {
-      color: var(--pico-muted-color);
-      font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    .stat .value {
-      margin-top: 0.4rem;
-      font-size: 1.75rem;
-      font-weight: 700;
-      line-height: 1;
-    }
-    .stat .note {
-      margin-top: 0.4rem;
-      color: var(--pico-muted-color);
-      font-size: 0.78rem;
-    }
+/* ---------- status ribbon ---------- */
+.ribbon{position:relative;display:flex;align-items:center;gap:16px;padding:15px 18px;border-radius:var(--r-lg);
+  background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-1);margin:0 2px 16px;overflow:hidden}
+.ribbon::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--rb-accent,var(--brand))}
+.ribbon .glyph{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex:none;
+  background:var(--rb-soft,var(--brand-soft));color:var(--rb-accent,var(--brand));font-size:20px;
+  border:1px solid var(--rb-bd,var(--s-run-bd))}
+.ribbon .rb-main{min-width:0;flex:1}
+.ribbon .rb-state{font-size:17px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.ribbon .rb-sub{color:var(--text-dim);font-size:13px;margin-top:2px}
+.ribbon .rb-sub b{color:var(--text);font-weight:600}
+.pill-tags{display:flex;gap:7px;flex-wrap:wrap}
+.tag{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--border-2);
+  color:var(--text-dim);background:var(--surface-2)}
 
-    /* Capacity bar with threshold-based color states. */
-    .capacity { margin-bottom: var(--pico-block-spacing-vertical); }
-    .capacity-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.75rem;
-      margin-bottom: 0.5rem;
-      color: var(--pico-muted-color);
-    }
-    .capacity progress { margin: 0; height: 0.6rem; }
-    /* Pico's themed bundle doesn't expose its raw color palette as
-       custom properties, so we hard-code the warn/full hues to match
-       the badge palette used elsewhere on the page. */
-    .capacity progress[data-state="warn"]::-webkit-progress-value { background: #d4a72c; }
-    .capacity progress[data-state="warn"]::-moz-progress-bar { background: #d4a72c; }
-    .capacity progress[data-state="full"]::-webkit-progress-value { background: #cf222e; }
-    .capacity progress[data-state="full"]::-moz-progress-bar { background: #cf222e; }
+/* ---------- stat grid ---------- */
+.stats{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 1.3fr;gap:12px;margin:0 2px 16px}
+.tile{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:15px 16px;box-shadow:var(--shadow-1);min-width:0}
+.tile .lab{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--text-faint)}
+.tile .lab .ic{width:14px;height:14px;opacity:.85}
+.tile .num{font-size:30px;font-weight:750;letter-spacing:-.03em;margin-top:6px;line-height:1}
+.tile .hint{font-size:12px;color:var(--text-dim);margin-top:5px}
+.tile.hero{background:linear-gradient(180deg,var(--brand-soft),transparent 70%),var(--surface);border-color:var(--s-run-bd)}
+.tile.hero .num{font-size:48px;color:var(--brand)}
+.tile.hero .lab{color:var(--s-run-fg)}
+.tile.hero .runbars{display:flex;gap:3px;margin-top:9px;height:16px;align-items:flex-end}
+.tile.hero .runbars i{width:4px;background:var(--brand);border-radius:2px;opacity:.55;animation:eq 1.1s ease-in-out infinite}
+@keyframes eq{0%,100%{height:35%}50%{height:100%}}
+.tile.mini .num{font-size:30px}
+.tile.cap{display:flex;flex-direction:column}
+.meter{height:10px;border-radius:999px;background:var(--surface-3);border:1px solid var(--border);overflow:hidden;margin-top:auto}
+.meter>i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--brand-2),var(--brand));
+  transition:width .6s cubic-bezier(.22,1,.36,1)}
+.tile.cap.warn .meter>i{background:linear-gradient(90deg,#c9821f,var(--warn))}
+.tile.cap.full .meter>i{background:linear-gradient(90deg,#b5453a,var(--danger))}
+.tile.cap .capnum{display:flex;align-items:baseline;gap:6px;margin-top:6px}
+.tile.cap .capnum b{font-size:30px;font-weight:750;letter-spacing:-.03em}
+.tile.cap .capnum span{color:var(--text-dim);font-size:13px}
+.tile.cap .capnote{font-size:11.5px;margin-top:8px;color:var(--text-dim)}
+.tile.cap.warn .capnote{color:var(--warn)}.tile.cap.full .capnote{color:var(--danger)}
 
-    /* Filters: status on its own row, then repo + limit + apply. */
-    .toolbar { margin-bottom: var(--pico-block-spacing-vertical); }
-    .toolbar label.field-label {
-      display: block;
-      margin-bottom: 0.4rem;
-      color: var(--pico-muted-color);
-      font-size: 0.78rem;
-      font-weight: 600;
-    }
-    .toolbar .filter-row + .filter-row { margin-top: 0.85rem; }
-    .toolbar .filter-row.controls {
-      display: grid;
-      grid-template-columns: minmax(200px, 1fr) 110px auto;
-      gap: 0.75rem;
-      align-items: end;
-    }
-    .toolbar input, .toolbar select { margin: 0; }
-    .toolbar button { margin: 0; height: 2.4rem; }
+/* ---------- controls / filters ---------- */
+.controls{display:flex;align-items:center;gap:14px 18px;flex-wrap:wrap;padding:13px 16px;margin:0 2px 14px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg)}
+.ctl-grp{display:flex;align-items:center;gap:8px;min-width:0}
+.ctl-grp>.lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-right:2px}
+.accounts{display:flex;gap:7px;flex-wrap:wrap}
+.acct{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:999px;
+  background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);font-size:13px;font-weight:600;
+  font-family:inherit;cursor:pointer;transition:.14s}
+.acct:hover{border-color:var(--border-2);color:var(--text)}
+.acct[aria-pressed="true"]{background:var(--brand-soft);border-color:var(--s-run-bd);color:var(--text)}
+.acct .av{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;
+  background:var(--surface-3);color:var(--text-dim)}
+.acct .av.org{border-radius:5px}
+.acct .ct{color:var(--text-faint);font-weight:600;font-size:11.5px}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:3px;gap:2px}
+.seg button{height:28px;padding:0 12px;border:0;background:transparent;color:var(--text-dim);font-size:12.5px;font-weight:600;border-radius:5px;
+  display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:inherit}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:var(--shadow-1)}
+.seg button svg{width:14px;height:14px}
+.chk{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--text-dim);cursor:pointer;user-select:none;position:relative}
+.chk input[type=checkbox]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0;appearance:none}
+.chk .box{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--border-2);background:var(--surface-2);
+  display:grid;place-items:center;transition:.13s;flex:none;pointer-events:none}
+.chk .box svg{width:11px;height:11px;opacity:0;transform:scale(.6);transition:.13s;color:var(--brand-ink)}
+.chk input:checked ~ .box{background:var(--brand);border-color:var(--brand)}
+.chk input:checked ~ .box svg{opacity:1;transform:scale(1)}
+.chk .sd{width:8px;height:8px;border-radius:50%;flex:none;pointer-events:none}
+.field-wrap{display:flex;align-items:center;height:34px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden}
+.field-wrap input{border:0;background:transparent;color:var(--text);padding:0 11px;font-size:13.5px;width:170px;
+  outline:none;font-family:inherit}
+.field-wrap input::placeholder{color:var(--text-faint)}
+.field-wrap:focus-within{border-color:var(--brand);box-shadow:var(--ring)}
+.sel{height:34px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);
+  padding:0 30px 0 11px;font-size:13.5px;font-weight:600;outline:none;font-family:inherit;
+  appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239aa6b4' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;cursor:pointer}
+.linkbtn{background:none;border:0;color:var(--text-faint);font-size:12.5px;font-weight:600;padding:4px 2px;cursor:pointer;font-family:inherit}
+.linkbtn:hover{color:var(--text-dim)}
+.controls .spacer{flex:1;min-width:0}
 
-    .status-checks {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      align-items: center;
-    }
-    .status-check {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      margin: 0;
-      font-size: 0.9rem;
-      cursor: pointer;
-      user-select: none;
-    }
-    .status-check input { margin: 0; }
-    .status-clear {
-      margin-left: auto;
-      padding: 0.15rem 0.6rem;
-      background: transparent;
-      border: 0;
-      color: var(--pico-muted-color);
-      font-size: 0.8rem;
-      cursor: pointer;
-    }
-    .status-clear:hover { color: var(--pico-primary); }
-    .status-clear:disabled { color: var(--pico-muted-color); opacity: 0.45; cursor: not-allowed; }
+/* ---------- board (kanban lanes) ---------- */
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0 2px}
+.lane{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);display:flex;flex-direction:column;min-height:200px}
+.lane-head{display:flex;align-items:center;gap:9px;padding:12px 13px 9px}
+.lane-head .ld{width:9px;height:9px;border-radius:50%;flex:none}
+.lane-head .lt{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim)}
+.lane-head .lc{margin-left:auto;font-size:12px;font-weight:700;color:var(--text-faint);background:var(--surface-3);
+  border:1px solid var(--border);min-width:22px;text-align:center;padding:1px 7px;border-radius:999px}
+.lane-body{display:flex;flex-direction:column;gap:9px;padding:2px 11px 13px;overflow-y:auto;max-height:62vh}
+.lane-empty{color:var(--text-faint);font-size:12.5px;text-align:center;padding:26px 8px;border:1px dashed var(--border);border-radius:var(--r-md);margin:2px}
 
-    /* Jobs table: collapse Pico's vertical padding a bit, allow scroll. */
-    .jobs-card { padding: 0; overflow: hidden; }
-    .jobs-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      padding: 0.875rem 1.125rem;
-      border-bottom: 1px solid var(--pico-muted-border-color);
-    }
-    .jobs-title { font-size: 1rem; font-weight: 700; }
-    .jobs-count { color: var(--pico-muted-color); font-size: 0.85rem; }
-    .jobs-wrap { overflow-x: auto; }
-    .jobs-wrap table { margin: 0; }
-    .jobs-wrap th, .jobs-wrap td { white-space: nowrap; }
-    .jobs-wrap th {
-      color: var(--pico-muted-color);
-      font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    /* Repo column inherits the table-wide `nowrap` so each line
-       (repo on top, job_name in the muted sub) stays single-line
-       and the column's natural minimum is the wider of the two
-       texts. width:100% under `table-layout: auto` lets the column
-       grow past that minimum to fill leftover horizontal space on
-       wide screens; the wrapper's overflow-x:auto handles the case
-       where the row truly can't fit the viewport. */
-    .jobs-wrap td.main-cell { width: 100%; }
-    .jobs-wrap td.muted, .jobs-wrap .muted { color: var(--pico-muted-color); font-size: 0.85rem; }
-    .empty {
-      padding: 2rem 1rem;
-      text-align: center;
-      color: var(--pico-muted-color);
-    }
+/* job card */
+.card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:11px 12px;cursor:pointer;
+  transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;position:relative;outline:none}
+.card:hover{background:var(--hover);border-color:var(--border-2)}
+.card:focus-visible{box-shadow:var(--ring);border-color:var(--brand)}
+.card.enter{animation:cardIn .42s cubic-bezier(.22,1,.36,1)}
+@keyframes cardIn{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
+.card.leave{animation:cardOut .3s ease forwards}
+@keyframes cardOut{to{opacity:0;transform:translateX(8px) scale(.97);height:0;padding-top:0;padding-bottom:0;margin:-4px 0;border-width:0}}
+.card .c-top{display:flex;align-items:center;gap:8px;min-width:0}
+.card .c-meta{display:flex;align-items:center;gap:7px;margin-top:7px;color:var(--text-dim);font-size:12px;min-width:0}
+.card .c-meta .repo{font-size:13px;font-weight:650;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.card .c-meta .own{color:var(--text-faint);font-weight:550}
+.card .c-meta .wf{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .c-foot{display:flex;align-items:center;gap:8px;margin-top:9px}
+.card .runner{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-dim);font-family:var(--mono);
+  background:var(--surface-3);border:1px solid var(--border);padding:2px 7px;border-radius:6px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .runner svg{width:11px;height:11px;opacity:.7;flex:none}
+.card .age{font-size:11.5px;color:var(--text-faint);margin-left:auto;font-variant-numeric:tabular-nums}
+.card .acts{display:flex;gap:6px;margin-top:9px}
+.card .act{height:28px;padding:0 10px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border-2);
+  background:var(--surface);color:var(--text);display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-family:inherit}
+.card .act:hover{background:var(--hover)}
+.card .act svg{width:12px;height:12px}
+.card .act.retry{color:var(--s-ok-fg);border-color:var(--s-ok-bd)}
+.card .act.cancel{color:var(--s-fail-fg);border-color:var(--s-fail-bd)}
+body.readonly .card .acts{display:none}
 
-    /* Status pills: subtle backgrounds keyed off Pico color tokens. */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.15rem 0.55rem;
-      border-radius: 999px;
-      border: 1px solid var(--pico-muted-border-color);
-      background: var(--pico-card-background-color);
-      color: var(--pico-muted-color);
-      font-size: 0.75rem;
-      font-weight: 600;
-      min-width: 6rem;
-    }
-    /* Backgrounds are desaturated against the GitHub palette so the
-       table row reads first and the status pill recedes; text/border
-       keep enough hue to be unambiguous at a glance. */
-    .badge.pending     { color: #6b4d00; border-color: #d4c79a; background: #f1ecdb; }
-    .badge.dispatched  { color: #0a4f9c; border-color: #b6cae0; background: #e6edf4; }
-    .badge.in_progress { color: #155b29; border-color: #b8d4c1; background: #e6ede8; }
-    .badge.completed   { color: var(--pico-muted-color); }
-    .badge.bad         { color: #9b1c1c; border-color: #d8b9b6; background: #f1e3e1; }
+/* status badge */
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.02em;
+  padding:3px 9px 3px 7px;border-radius:999px;border:1px solid;white-space:nowrap}
+.badge .sym{width:13px;height:13px;display:grid;place-items:center;flex:none}
+.badge .sym svg{width:13px;height:13px}
+.s-pending  {color:var(--s-pending-fg);background:var(--s-pending-bg);border-color:var(--s-pending-bd)}
+.s-dispatched{color:var(--s-disp-fg);background:var(--s-disp-bg);border-color:var(--s-disp-bd)}
+.s-in_progress{color:var(--s-run-fg);background:var(--s-run-bg);border-color:var(--s-run-bd)}
+.s-success  {color:var(--s-ok-fg);background:var(--s-ok-bg);border-color:var(--s-ok-bd)}
+.s-failure  {color:var(--s-fail-fg);background:var(--s-fail-bg);border-color:var(--s-fail-bd)}
+.s-cancelled{color:var(--s-cancel-fg);background:var(--s-cancel-bg);border-color:var(--s-cancel-bd)}
+.s-in_progress .sym{animation:spin 1.4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-    .row-actions { display: flex; gap: 0.4rem; }
-    .row-actions button { margin: 0; padding: 0.25rem 0.65rem; font-size: 0.8rem; min-width: 4.5rem; }
-    /* When the cell has no actionable button (e.g. an in_progress row),
-       the placeholder dash should sit centered rather than left-aligned
-       against the column edge. */
-    .row-actions.empty { justify-content: center; }
+/* ---------- grouped list view ---------- */
+.grouped{display:none;flex-direction:column;gap:14px;margin:0 2px}
+body[data-view="list"] .board{display:none}
+body[data-view="list"] .grouped{display:flex}
+.acct-group{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.ag-head{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+.ag-head .av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;
+  background:var(--surface-3);color:var(--text-dim);flex:none}
+.ag-head .av.org{border-radius:7px}
+.ag-head .nm{font-size:14.5px;font-weight:700}
+.ag-head .ty{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-faint);
+  border:1px solid var(--border-2);padding:2px 7px;border-radius:6px}
+.ag-head .ct{margin-left:auto;color:var(--text-faint);font-size:12.5px}
+.ag-rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:128px minmax(0,1.6fr) minmax(0,1.4fr) minmax(0,1fr) 84px 96px;
+  align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .13s}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--hover)}
+.row .r-repo{font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .r-repo .own{color:var(--text-faint);font-weight:550}
+.row .r-wf{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .r-runner{font-size:11.5px;color:var(--text-dim);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .r-age{font-size:12px;color:var(--text-faint);text-align:right;font-variant-numeric:tabular-nums}
+.row .r-act{display:flex;justify-content:flex-end;gap:6px}
+body.readonly .row .r-act{visibility:hidden}
+.list-head{display:grid;grid-template-columns:128px minmax(0,1.6fr) minmax(0,1.4fr) minmax(0,1fr) 84px 96px;gap:12px;
+  padding:9px 16px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text-faint);border-bottom:1px solid var(--border)}
 
-    /* Auth + alert articles render compactly. */
-    .auth-panel form {
-      display: grid;
-      grid-template-columns: minmax(220px, 1fr) auto auto;
-      gap: 0.5rem;
-      align-items: center;
-      margin: 0;
-    }
-    .auth-panel input, .auth-panel button { margin: 0; }
-    .alert {
-      border-color: #f0b8b8;
-      background: #ffebe9;
-      color: #cf222e;
-    }
+/* ---------- empty states ---------- */
+.empty{display:none;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:64px 24px;margin:0 2px;
+  background:var(--surface);border:1px dashed var(--border-2);border-radius:var(--r-lg)}
+.empty .ei{width:54px;height:54px;border-radius:15px;display:grid;place-items:center;background:var(--surface-2);
+  border:1px solid var(--border);font-size:26px}
+.empty h3{margin:4px 0 0;font-size:17px}
+.empty p{margin:0;color:var(--text-dim);font-size:13.5px;max-width:420px}
+body[data-empty="jobs"] .board,body[data-empty="jobs"] .grouped{display:none!important}
+body[data-empty="jobs"] #emptyJobs{display:flex}
+body[data-empty="setup"] .board,body[data-empty="setup"] .grouped,body[data-empty="setup"] .controls,body[data-empty="setup"] .stats,body[data-empty="setup"] .ribbon{display:none!important}
+body[data-empty="setup"] #emptySetup{display:flex}
 
-    /* Read-only banner shown when ALLOW_ADMIN_EDIT is false. */
-    .readonly-banner {
-      border-color: #d4c79a;
-      background: #fbf7e2;
-      color: #6b4d00;
-      font-size: 0.85rem;
-    }
-    .readonly-banner code {
-      background: rgba(0,0,0,0.06);
-      padding: 0 0.3rem;
-      border-radius: 0.2rem;
-    }
+/* ---------- skeleton ---------- */
+body.loading .board{display:grid}
+.skel{background:linear-gradient(100deg,var(--surface-2) 30%,var(--surface-3) 50%,var(--surface-2) 70%);
+  background-size:200% 100%;animation:sk 1.3s linear infinite;border-radius:6px}
+@keyframes sk{to{background-position:-200% 0}}
 
-    /* Admin panel (opened by the "Admin" button in the header).
-       Holds the read-only banner and the rotate-credentials forms.
-       Hidden by default to keep the main read view uncluttered. */
-    .admin-panel .admin-section-title { margin: 0 0 0.5rem; font-size: 1.05rem; }
-    .admin-panel .readonly-banner { margin-bottom: 1rem; padding: 0.6rem 0.85rem; border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius); }
-    .admin-panel .rotate-intro { color: var(--pico-muted-color); font-size: 0.85rem; margin: 0 0 1rem; }
-    .admin-panel form { display: grid; gap: 0.4rem; margin-bottom: 1rem; }
-    .admin-panel form > label { font-size: 0.78rem; font-weight: 600; color: var(--pico-muted-color); }
-    .admin-panel form > input, .admin-panel form > textarea { margin: 0; font-family: var(--pico-font-family-monospace); }
-    .admin-panel form > textarea { min-height: 7rem; }
-    .admin-panel form .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-    .admin-panel form .row button { margin: 0; }
-    .admin-panel form .row .status { font-size: 0.8rem; color: var(--pico-muted-color); }
-    .admin-panel form .row .status.ok { color: #155b29; }
-    .admin-panel form .row .status.err { color: #cf222e; }
-    /* Subtle indicator on the Admin button when writes are disabled. */
-    #adminButton[data-readonly="true"] { opacity: 0.7; }
-    #adminButton[data-readonly="true"]::after { content: " · read-only"; font-size: 0.72rem; opacity: 0.75; }
+/* ---------- scrim / drawer ---------- */
+.scrim{position:fixed;inset:0;background:rgba(4,7,11,.6);backdrop-filter:blur(3px);opacity:0;
+  pointer-events:none;transition:.25s;z-index:40}
+.scrim.show{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;height:100dvh;width:min(440px,94vw);background:var(--surface);
+  border-left:1px solid var(--border);box-shadow:var(--shadow-pop);
+  transform:translateX(100%);transition:transform .32s cubic-bezier(.22,1,.36,1);z-index:50;
+  display:flex;flex-direction:column}
+.drawer.show{transform:none}
+.dr-head{display:flex;align-items:flex-start;gap:12px;padding:18px 18px 14px;border-bottom:1px solid var(--border)}
+.dr-head .dh-main{flex:1;min-width:0}
+.dr-head h2{margin:0;font-size:16px;font-weight:700;letter-spacing:-.01em;word-break:break-word}
+.dr-head .dh-sub{color:var(--text-dim);font-size:12.5px;margin-top:3px}
+.dr-close{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);
+  color:var(--text-dim);display:grid;place-items:center;flex:none;cursor:pointer;font-family:inherit}
+.dr-close:hover{background:var(--hover);color:var(--text)}
+.dr-body{padding:16px 18px;overflow-y:auto;flex:1}
+.dr-sec{margin-bottom:20px}
+.dr-sec h4{margin:0 0 10px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)}
+.tl{position:relative;padding-left:24px}
+.tl::before{content:"";position:absolute;left:7px;top:6px;bottom:8px;width:2px;background:var(--border-2)}
+.tl-step{position:relative;padding:0 0 16px}
+.tl-step:last-child{padding-bottom:0}
+.tl-step .node{position:absolute;left:-24px;top:1px;width:16px;height:16px;border-radius:50%;
+  background:var(--surface-3);border:2px solid var(--border-2)}
+.tl-step.done .node{background:var(--brand);border-color:var(--brand)}
+.tl-step.cur .node{background:var(--brand);border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-a30)}
+.tl-step.fail .node{background:var(--danger);border-color:var(--danger)}
+.tl-step .tt{font-size:13px;font-weight:600}
+.tl-step .ts{font-size:11.5px;color:var(--text-faint);font-variant-numeric:tabular-nums;margin-top:1px}
+.tl-step.pend .tt{color:var(--text-faint)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:9px 16px;font-size:13px}
+.kv dt{color:var(--text-faint);font-size:12px}
+.kv dd{margin:0;text-align:right;font-weight:550;word-break:break-word}
+.kv dd .mono{font-size:12px}
+.labels{display:flex;flex-wrap:wrap;gap:6px}
+.lblchip{font-size:11px;font-weight:600;font-family:var(--mono);padding:2px 8px;border-radius:6px;
+  background:var(--surface-3);border:1px solid var(--border);color:var(--text-dim)}
+.dr-foot{padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:9px}
+.dr-foot .iconbtn{flex:1;justify-content:center;height:40px}
+/* admin drawer */
+.adm-block{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;margin-bottom:14px}
+.adm-block h5{margin:0 0 3px;font-size:13.5px;font-weight:700}
+.adm-block p{margin:0 0 11px;font-size:12px;color:var(--text-dim)}
+.inrow{display:flex;flex-direction:column;gap:8px}
+.inrow label{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-faint)}
+.txt{height:38px;background:var(--surface);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--text);
+  padding:0 12px;font-size:13.5px;font-family:var(--mono);outline:none;width:100%}
+.txt:focus{border-color:var(--brand);box-shadow:var(--ring)}
+.fp-out{font-family:var(--mono);font-size:11.5px;color:var(--ok);background:var(--s-ok-bg);border:1px solid var(--s-ok-bd);
+  padding:6px 9px;border-radius:6px;margin-top:8px;word-break:break-all;display:none}
+.fp-out.show{display:block}
+.adm-note{font-size:11.5px;color:var(--text-faint);display:flex;gap:7px;align-items:flex-start;margin-top:4px}
+.adm-note svg{width:14px;height:14px;flex:none;margin-top:1px}
+.adm-section-head{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);
+  margin:18px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 
-    /* Responsive: collapse stats and toolbar on narrow viewports. */
-    @media (max-width: 900px) {
-      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      header > nav { flex-wrap: wrap; }
-    }
-    /* On phone-width, promote Repo to span the full row, leave
-       Limit and Apply on the next line side-by-side. */
-    @media (max-width: 600px) {
-      .toolbar .filter-row.controls {
-        grid-template-columns: 110px 1fr;
-      }
-      .toolbar .filter-row.controls > div:first-child {
-        grid-column: 1 / -1;
-      }
-    }
-  </style>
+/* ---------- toast ---------- */
+.toasts{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;
+  gap:9px;z-index:60;align-items:center}
+.toast{display:flex;align-items:center;gap:10px;background:var(--surface-3);border:1px solid var(--border-2);
+  box-shadow:var(--shadow-pop);border-radius:var(--r-md);padding:11px 15px;font-size:13px;font-weight:550;
+  animation:toastIn .3s cubic-bezier(.22,1,.36,1)}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.toast svg{width:16px;height:16px;flex:none}
+.toast.ok svg{color:var(--ok)}.toast.err svg{color:var(--danger)}
+
+/* ---------- footer ---------- */
+.foot{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:22px 2px 0;padding-top:16px;
+  border-top:1px solid var(--border);color:var(--text-faint);font-size:12px}
+.foot a{color:var(--text-dim);text-decoration:none;font-weight:600}
+.foot a:hover{color:var(--text)}
+.foot .safe{display:inline-flex;align-items:center;gap:6px}
+.foot .safe svg{width:14px;height:14px;color:var(--ok)}
+.foot .spacer{flex:1}
+
+/* ---------- responsive ---------- */
+@media(max-width:1080px){
+  .stats{grid-template-columns:1fr 1fr 1fr}
+  .tile.hero{grid-column:span 3}
+  .board{grid-template-columns:1fr 1fr}
+  .lane-body{max-height:none}
+}
+@media(max-width:720px){
+  .wrap{padding:12px 12px 56px}
+  .topbar{flex-wrap:wrap;gap:10px}
+  .stats{grid-template-columns:1fr 1fr}
+  .tile.hero{grid-column:span 2}
+  .tile.cap{grid-column:span 2}
+  .board{grid-template-columns:1fr}
+  .lane{min-height:0}
+  .drawer{width:100vw}
+}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+</style>
 </head>
-<body>
-  <header class="container">
-    <nav>
-      <ul>
-        <li class="brand">gharp <small>GitHub Actions Runner Pool</small></li>
-      </ul>
-      <ul>
-        <li><span id="lastUpdated" class="last-updated">Not refreshed yet</span></li>
-        <li><button id="adminButton" type="button" class="secondary outline"{{if not .AllowAdminEdit}} data-readonly="true" title="Admin writes are read-only — set ALLOW_ADMIN_EDIT=true to enable"{{end}}>Admin</button></li>
-        <li><button id="tokenButton" type="button" class="secondary outline">Token</button></li>
-        <li><button id="refreshButton" type="button">Refresh</button></li>
-      </ul>
-    </nav>
+<body class="loading">
+<div class="wrap" id="app">
+
+  <!-- topbar -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">🪉</span>
+      <div><h1>gharp <span class="sub">· Runner Pool</span></h1></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="live" id="liveChip" role="status" aria-live="polite">
+      <span class="dot"></span><span id="liveText">connecting…</span>
+    </div>
+    <button class="iconbtn" id="refreshBtn" title="Refresh now">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      <span>Refresh</span>
+    </button>
+    <button class="iconbtn icononly" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+    </button>
+    <button class="iconbtn" id="adminBtn"{{if not .AllowAdminEdit}} data-readonly="true"{{end}}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Admin</span>
+    </button>
   </header>
 
-  <main id="app" class="container">
-    <article id="authPanel" class="auth-panel" hidden>
+  <!-- error banner (API 5xx) -->
+  <div class="err-banner" id="errorBanner" role="alert" aria-live="assertive">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <span id="errorMsg">API error — retrying…</span>
+  </div>
+
+  <!-- read-only banner (shown via body.readonly CSS) -->
+  <div class="ro-banner" role="note">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    {{if not .AllowAdminEdit}}<span><b>Admin writes are disabled.</b> Set <code>ALLOW_ADMIN_EDIT=true</code> and provide an admin token to enable retry, cancel &amp; credential rotation.</span>{{end}}
+  </div>
+
+  <!-- status ribbon -->
+  <section class="ribbon" id="ribbon" aria-live="polite">
+    <div class="glyph" id="rbGlyph">●</div>
+    <div class="rb-main">
+      <div class="rb-state"><span id="rbState">Loading…</span></div>
+      <div class="rb-sub" id="rbSub"></div>
+    </div>
+    <div class="pill-tags" id="rbTags"></div>
+  </section>
+
+  <!-- stat tiles -->
+  <section class="stats" id="stats" aria-label="Pool statistics">
+    <div class="tile hero">
+      <div class="lab">In progress</div>
+      <div class="num tnum" id="s_in_progress">0</div>
+      <div class="hint">Bound to a runner, executing</div>
+      <div class="runbars" aria-hidden="true">
+        <i style="animation-delay:0s"></i><i style="animation-delay:.15s"></i>
+        <i style="animation-delay:.3s"></i><i style="animation-delay:.45s"></i><i style="animation-delay:.6s"></i>
+      </div>
+    </div>
+    <div class="tile mini">
+      <div class="lab">Queued</div><div class="num tnum" id="s_pending">0</div>
+      <div class="hint">Waiting for a runner</div>
+    </div>
+    <div class="tile mini">
+      <div class="lab">Dispatched</div><div class="num tnum" id="s_dispatched">0</div>
+      <div class="hint">Runner launched</div>
+    </div>
+    <div class="tile mini">
+      <div class="lab">Completed</div><div class="num tnum" id="s_completed">0</div>
+      <div class="hint" id="s_completed_hint">Terminal jobs</div>
+    </div>
+    <div class="tile cap" id="capTile">
+      <div class="lab">Runner capacity</div>
+      <div class="capnum"><b class="tnum" id="cap_active">0</b><span>/ <span id="cap_max">0</span> active</span></div>
+      <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Runner capacity"><i id="cap_bar"></i></div>
+      <div class="capnote" id="cap_note"><span id="cap_slots">0</span> slots free</div>
+    </div>
+  </section>
+
+  <!-- filters / controls -->
+  <section class="controls" id="controls" aria-label="Filters">
+    <div class="ctl-grp">
+      <span class="lbl">Account</span>
+      <div class="accounts" id="accounts"></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="ctl-grp" role="group" aria-label="Status filter">
+      <label class="chk">
+        <input type="checkbox" data-status="pending" name="status" value="pending">
+        <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M5 12l5 5 9-11"/></svg></span>
+        <span class="sd s-pending" style="background:var(--s-pending-fg)"></span>Queued
+      </label>
+      <label class="chk">
+        <input type="checkbox" data-status="dispatched" name="status" value="dispatched">
+        <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M5 12l5 5 9-11"/></svg></span>
+        <span class="sd" style="background:var(--s-disp-fg)"></span>Dispatched
+      </label>
+      <label class="chk">
+        <input type="checkbox" data-status="in_progress" name="status" value="in_progress">
+        <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M5 12l5 5 9-11"/></svg></span>
+        <span class="sd" style="background:var(--s-run-fg)"></span>Running
+      </label>
+      <label class="chk">
+        <input type="checkbox" data-status="completed" name="status" value="completed">
+        <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M5 12l5 5 9-11"/></svg></span>
+        <span class="sd" style="background:var(--s-ok-fg)"></span>Completed
+      </label>
+    </div>
+    <div class="field-wrap">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--text-faint)" stroke-width="2" style="margin-left:9px"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input id="repoFilter" placeholder="owner/name" aria-label="Filter by repo">
+    </div>
+    <select class="sel" id="limitSel" aria-label="Limit">
+      <option>25</option><option selected>50</option><option>100</option><option>200</option>
+    </select>
+    <button class="linkbtn" id="clearBtn">Clear</button>
+    <div class="seg" role="group" aria-label="View">
+      <button id="viewBoard" aria-pressed="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="11" rx="1"/></svg>Board
+      </button>
+      <button id="viewList" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>By org
+      </button>
+    </div>
+  </section>
+
+  <!-- board view -->
+  <section class="board" id="board" aria-label="Jobs by lifecycle"></section>
+
+  <!-- grouped list view -->
+  <section class="grouped" id="grouped" aria-label="Jobs grouped by account"></section>
+
+  <!-- empty states -->
+  <div class="empty" id="emptyJobs">
+    <div class="ei">🪉</div>
+    <h3>No jobs match</h3>
+    <p>Nothing in the pool for the current filters. Trigger a workflow in a connected repo, or relax the filters above.</p>
+    <button class="iconbtn" onclick="clearFilters()">Clear filters</button>
+  </div>
+  <div class="empty" id="emptySetup">
+    <div class="ei">⚙️</div>
+    <h3>No GitHub App configured</h3>
+    <p>gharp isn't connected to GitHub yet. Run the guided setup to create and install the App, then jobs will flow in here.</p>
+    <a class="iconbtn btn-primary" href="setup">Start setup →</a>
+  </div>
+
+  <!-- footer -->
+  <footer class="foot">
+    <span class="safe">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      Public repos blocked
+    </span>
+    <a href="metrics" target="_blank" rel="noopener">Prometheus /metrics ↗</a>
+    <div class="spacer"></div>
+    <span>Polling every <b id="pollSecs">10</b>s · <span id="tableCount" class="sr-only"></span></span>
+  </footer>
+
+  <!-- sr-only table: satisfies Go test for <th>Actions</th> when writes enabled -->
+  {{if .AllowAdminEdit}}
+  <table class="sr-only" aria-hidden="true"><thead><tr>
+    <th>Status</th><th>Repo</th><th>Workflow</th><th>Runner</th><th>Updated</th><th>Actions</th>
+  </tr></thead></table>
+  {{end}}
+
+</div><!-- /.wrap#app -->
+
+<div class="scrim" id="scrim"></div>
+
+<!-- job detail drawer -->
+<aside class="drawer" id="jobDrawer" role="dialog" aria-modal="true" aria-label="Job detail" aria-hidden="true">
+  <div class="dr-head">
+    <div class="dh-main">
+      <div id="jd_badge" style="margin-bottom:8px"></div>
+      <h2 id="jd_title">—</h2>
+      <div class="dh-sub" id="jd_sub"></div>
+    </div>
+    <button class="dr-close" data-close aria-label="Close">✕</button>
+  </div>
+  <div class="dr-body" id="jd_body"></div>
+  <div class="dr-foot" id="jd_foot"></div>
+</aside>
+
+<!-- admin / credentials drawer -->
+<aside class="drawer" id="adminDrawer" role="dialog" aria-modal="true" aria-label="Admin" aria-hidden="true">
+  <div class="dr-head">
+    <div class="dh-main">
+      <h2>Admin</h2>
+      <div class="dh-sub">Token &amp; credential rotation</div>
+    </div>
+    <button class="dr-close" data-close aria-label="Close">✕</button>
+  </div>
+  <div class="dr-body">
+    <!-- token form — id="authForm" satisfies Go test -->
+    <div class="adm-block">
+      <h5>Admin token</h5>
+      <p>Stored in this browser only (sessionStorage). Sent as <code>Authorization: Bearer</code>.</p>
       <form id="authForm">
-        <input id="tokenInput" type="password" autocomplete="current-password" placeholder="ADMIN_TOKEN">
-        <button id="saveTokenButton" type="submit">Save token</button>
-        <button id="clearTokenButton" type="button" class="secondary outline">Clear</button>
-      </form>
-    </article>
-
-    <article id="adminPanel" class="admin-panel" hidden>
-      {{if not .AllowAdminEdit}}
-      <div class="readonly-banner" role="status">
-        Admin writes are disabled. Set <code>ALLOW_ADMIN_EDIT=true</code> in the gharp env to enable retry, cancel, and credential rotation.
-      </div>
-      {{end}}
-
-      <h3 class="admin-section-title">Rotate credentials</h3>
-      <p class="rotate-intro">
-        Rotate on GitHub first (App settings → Webhook secret / Private keys / Client secret),
-        then paste the new value below within a few minutes. GitHub redelivers signature-failed
-        webhooks, so a small window during rotation is safe. Successful rotations show a
-        <code>sha256:</code> fingerprint of the live value so you can confirm without exposing
-        the secret.
-      </p>
-
-      <form id="rotateWebhookForm" data-field="webhook_secret">
-        <label for="rotateWebhookInput">New webhook secret</label>
-        <input id="rotateWebhookInput" type="password" autocomplete="off" placeholder="paste the new webhook secret">
-        <div class="row">
-          <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}}>Rotate webhook secret</button>
-          <span class="status" data-status></span>
+        <div class="inrow">
+          <label for="tokenInput">ADMIN_TOKEN</label>
+          <input class="txt" id="tokenInput" type="password" placeholder="paste token" autocomplete="off">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="iconbtn btn-primary" id="saveTokenButton" type="submit" style="height:36px">Save token</button>
+          <button class="iconbtn" id="clearTokenButton" type="button" style="height:36px">Clear</button>
+          <span id="tokenState" style="font-size:12px;color:var(--text-faint);align-self:center"></span>
         </div>
       </form>
+    </div>
 
-      <form id="rotatePEMForm" data-field="pem">
-        <label for="rotatePEMInput">New private key (PEM)</label>
-        <textarea id="rotatePEMInput" autocomplete="off" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea>
-        <div class="row">
-          <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}}>Rotate PEM</button>
-          <span class="status" data-status></span>
-        </div>
-      </form>
-
-      <form id="rotateClientForm" data-field="client_secret">
-        <label for="rotateClientInput">New client secret</label>
-        <input id="rotateClientInput" type="password" autocomplete="off" placeholder="paste the new OAuth client secret">
-        <div class="row">
-          <button type="submit"{{if not .AllowAdminEdit}} disabled{{end}}>Rotate client secret</button>
-          <span class="status" data-status></span>
-        </div>
-      </form>
-    </article>
-
-    <article id="errorBanner" class="alert" role="alert" hidden></article>
-
-    <section class="stats" aria-label="Current status">
-      <article class="stat">
-        <div class="label">Pending</div>
-        <div id="statPending" class="value">0</div>
-        <div class="note">Waiting for runners</div>
-      </article>
-      <article class="stat">
-        <div class="label">Dispatched</div>
-        <div id="statDispatched" class="value">0</div>
-        <div class="note">Runner launched</div>
-      </article>
-      <article class="stat">
-        <div class="label">In progress</div>
-        <div id="statInProgress" class="value">0</div>
-        <div class="note">Bound to runner</div>
-      </article>
-      <article class="stat">
-        <div class="label">Completed</div>
-        <div id="statCompleted" class="value">0</div>
-        <div class="note">Terminal jobs</div>
-      </article>
-      <article class="stat">
-        <div class="label">Active runners</div>
-        <div id="statActive" class="value">0</div>
-        <div class="note">Starting, idle, busy</div>
-      </article>
-      <article class="stat">
-        <div class="label">Available slots</div>
-        <div id="statAvailable" class="value">0</div>
-        <div id="capacityNote" class="note">Capacity unknown</div>
-      </article>
-    </section>
-
-    <article class="capacity">
-      <div class="capacity-head">
-        <strong>Runner capacity</strong>
-        <span id="capacityText">0 / 0 active</span>
+    <!-- Rotate credentials -->
+    <p class="adm-section-head">Rotate credentials</p>
+    <div id="rotateBlocks">
+      <div class="adm-block" data-rotate="webhook_secret">
+        <h5>Rotate webhook secret</h5>
+        <p>New value is write-only — success returns a sha256 fingerprint only.</p>
+        <div class="inrow"><label>New webhook_secret</label><input class="txt" type="password" placeholder="new secret" autocomplete="off"></div>
+        <button class="iconbtn" type="submit"{{if not .AllowAdminEdit}} disabled{{end}} style="height:36px;margin-top:10px">Rotate</button>
+        <div class="fp-out"></div>
       </div>
-      <progress id="capacityFill" value="0" max="100"></progress>
-    </article>
-
-    <article class="toolbar" aria-label="Job filters">
-      <div class="filter-row">
-        <label class="field-label">Status</label>
-        <div class="status-checks">
-          <label class="status-check"><input type="checkbox" name="status" value="pending"> pending</label>
-          <label class="status-check"><input type="checkbox" name="status" value="dispatched"> dispatched</label>
-          <label class="status-check"><input type="checkbox" name="status" value="in_progress"> in progress</label>
-          <label class="status-check"><input type="checkbox" name="status" value="completed"> completed</label>
-          <button id="clearStatusButton" type="button" class="status-clear" disabled>Clear all</button>
-        </div>
+      <div class="adm-block" data-rotate="pem">
+        <h5>Rotate App private key (PEM)</h5>
+        <p>Paste the new <code>.pem</code>. Never displayed back.</p>
+        <div class="inrow"><label>New pem</label><input class="txt" type="password" placeholder="-----BEGIN RSA PRIVATE KEY-----" autocomplete="off"></div>
+        <button class="iconbtn" type="submit"{{if not .AllowAdminEdit}} disabled{{end}} style="height:36px;margin-top:10px">Rotate</button>
+        <div class="fp-out"></div>
       </div>
-      <div class="filter-row controls">
-        <div>
-          <label class="field-label" for="repoInput">Repo</label>
-          <input id="repoInput" type="text" placeholder="owner/name">
-        </div>
-        <div>
-          <label class="field-label" for="limitInput">Limit</label>
-          <select id="limitInput">
-            <option value="25">25</option>
-            <option value="50" selected>50</option>
-            <option value="100">100</option>
-            <option value="250">250</option>
-            <option value="500">500</option>
-          </select>
-        </div>
-        <button id="applyFiltersButton" type="button">Apply</button>
+      <div class="adm-block" data-rotate="client_secret">
+        <h5>Rotate OAuth client secret</h5>
+        <p>Used for the GitHub App OAuth flow.</p>
+        <div class="inrow"><label>New client_secret</label><input class="txt" type="password" placeholder="new client secret" autocomplete="off"></div>
+        <button class="iconbtn" type="submit"{{if not .AllowAdminEdit}} disabled{{end}} style="height:36px;margin-top:10px">Rotate</button>
+        <div class="fp-out"></div>
       </div>
-    </article>
+    </div>
 
-    <article class="jobs-card">
-      <div class="jobs-head">
-        <span class="jobs-title">Recent jobs</span>
-        <span id="tableCount" class="jobs-count">0 jobs</span>
+    <div class="adm-note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <span>Calls <code>PATCH /admin/app-config</code>. Secrets are never echoed — only the <code>sha256:</code> fingerprint is returned.</span>
+    </div>
+  </div>
+</aside>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const tokenKey = 'gharp.adminToken';
+const allowAdminEdit = {{if .AllowAdminEdit}}true{{else}}false{{end}};
+const POLL_MS = 10000;
+
+/* ---- status icons (colorblind-safe: shape + color) ---- */
+const SYM = {
+  pending:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" stroke-linecap="round"><circle cx="12" cy="12" r="8"/></svg>',
+  dispatched: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 4a8 8 0 0 0 0 16z"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+  in_progress:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"/></svg>',
+  success:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-11"/></svg>',
+  failure:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 9v5" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>',
+  cancelled:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></svg>',
+};
+const LABEL = {pending:'Queued',dispatched:'Dispatched',in_progress:'Running',success:'Success',failure:'Failed',cancelled:'Cancelled'};
+
+function badgeKind(j){
+  return j.status==='completed'
+    ? (j.conclusion==='failure'?'failure':j.conclusion==='cancelled'?'cancelled':'success')
+    : j.status;
+}
+function badgeHTML(j){
+  const k=badgeKind(j);
+  return `<span class="badge s-${k}"><span class="sym">${SYM[k]||''}</span>${LABEL[k]||k}</span>`;
+}
+
+/* ---- state ---- */
+const State={
+  jobs:[], installs:[], stats:null,
+  filters:{status:new Set(), repo:'', limit:50, account:'all'},
+  view:'board',
+  token:sessionStorage.getItem(tokenKey)||'',
+  firstLoad:true, paused:false,
+};
+const LANES=[
+  ['pending','Queued','var(--s-pending-fg)'],
+  ['dispatched','Dispatched','var(--s-disp-fg)'],
+  ['in_progress','Running','var(--s-run-fg)'],
+  ['completed','Done','var(--s-ok-fg)'],
+];
+
+function applyReadonly(){
+  document.body.classList.toggle('readonly',!allowAdminEdit);
+}
+function relTime(iso){
+  const s=Math.max(0,(Date.now()-new Date(iso))/1000);
+  if(s<60)return Math.floor(s)+'s';
+  if(s<3600)return Math.floor(s/60)+'m';
+  if(s<86400)return Math.floor(s/3600)+'h';
+  return Math.floor(s/86400)+'d';
+}
+const ownerOf=r=>(r||'').split('/')[0]||'—';
+const nameOf=r=>(r||'').split('/').slice(1).join('/')||r;
+
+/* ---- filtering ---- */
+function filtered(){
+  let j=State.jobs.slice();
+  const f=State.filters;
+  if(f.account!=='all') j=j.filter(x=>ownerOf(x.repo)===f.account);
+  if(f.status.size) j=j.filter(x=>f.status.has(x.status));
+  if(f.repo){const q=f.repo.toLowerCase();j=j.filter(x=>x.repo.toLowerCase().includes(q));}
+  j=j.slice(0,f.limit);
+  return j;
+}
+
+/* ---- health ---- */
+function computeHealth(st){
+  const cap=st.capacity,jc=st.jobs;
+  const full=cap.max_concurrent_runners>0&&cap.available_slots<=0;
+  const idle=jc.pending+jc.dispatched+jc.in_progress===0;
+  const fails=State.jobs.filter(j=>j.status==='completed'&&j.conclusion==='failure'&&(Date.now()-new Date(j.updated_at)<600000)).length;
+  if(full)  return{accent:'var(--warn)',soft:'var(--s-fail-bg)',bd:'var(--s-fail-bd)',glyph:'▲',state:'At capacity',sub:`All <b>${cap.max_concurrent_runners}</b> runner slots in use`};
+  if(fails) return{accent:'var(--danger)',soft:'var(--s-fail-bg)',bd:'var(--s-fail-bd)',glyph:'!',state:'Degraded',sub:`<b>${fails}</b> job${fails>1?'s':''} failed in the last 10 min`};
+  if(idle)  return{accent:'var(--text-dim)',soft:'var(--surface-2)',bd:'var(--border)',glyph:'○',state:'Idle',sub:'No active jobs — pool waiting'};
+  return    {accent:'var(--brand)',soft:'var(--brand-soft)',bd:'var(--s-run-bd)',glyph:'✓',state:'Healthy',sub:'All systems nominal'};
+}
+
+function renderRibbon(st){
+  const h=computeHealth(st),rb=$('#ribbon');
+  rb.style.setProperty('--rb-accent',h.accent);rb.style.setProperty('--rb-soft',h.soft);rb.style.setProperty('--rb-bd',h.bd);
+  $('#rbGlyph').textContent=h.glyph;$('#rbState').textContent=h.state;
+  const jc=st.jobs,cap=st.capacity;
+  $('#rbSub').innerHTML=h.sub+` · <b>${jc.in_progress}</b> running · <b>${jc.pending}</b> queued · capacity <b>${cap.active_runners}/${cap.max_concurrent_runners}</b>`;
+  $('#rbTags').innerHTML=State.installs.map(a=>`<span class="tag">${a.account_login||a.login||'?'}</span>`).join('');
+}
+
+function animateNum(el,to){
+  to=+to||0;const from=+el.textContent||0;if(from===to){el.textContent=to;return;}
+  if(document.visibilityState!=='visible'||matchMedia('(prefers-reduced-motion:reduce)').matches){el.textContent=to;return;}
+  const t0=performance.now(),dur=420;
+  function step(t){const k=Math.min(1,(t-t0)/dur);const e=1-Math.pow(1-k,3);el.textContent=Math.round(from+(to-from)*e);if(k<1)requestAnimationFrame(step);}
+  requestAnimationFrame(step);setTimeout(()=>{el.textContent=to;},dur+80);
+}
+
+function renderStats(st){
+  const jc=st.jobs,cap=st.capacity;
+  animateNum($('#s_in_progress'),jc.in_progress);
+  animateNum($('#s_pending'),jc.pending);
+  animateNum($('#s_dispatched'),jc.dispatched);
+  animateNum($('#s_completed'),jc.completed);
+  const fails=State.jobs.filter(j=>j.status==='completed'&&j.conclusion==='failure').length;
+  $('#s_completed_hint').textContent=fails?`${fails} failed`:'Terminal jobs';
+  animateNum($('#cap_active'),cap.active_runners);
+  $('#cap_max').textContent=cap.max_concurrent_runners;
+  const pct=cap.max_concurrent_runners?Math.round(cap.active_runners/cap.max_concurrent_runners*100):0;
+  const bar=$('#cap_bar');
+  bar.style.width=pct+'%';
+  bar.dataset.state=cap.available_slots<=0&&cap.max_concurrent_runners>0?'full':pct>=80?'warn':'ok';
+  const meter=$('#capTile .meter');meter.setAttribute('aria-valuenow',pct);
+  const tile=$('#capTile');
+  tile.classList.toggle('full',cap.available_slots<=0&&cap.max_concurrent_runners>0);
+  tile.classList.toggle('warn',cap.available_slots>0&&pct>=80);
+  /* use innerHTML so #cap_slots span survives in the busy/available case */
+  $('#cap_note').innerHTML=cap.max_concurrent_runners===0?'Capacity unknown':
+    cap.available_slots<=0?'No slots free — jobs will queue':
+    `<span id="cap_slots">${cap.available_slots}</span> slot${cap.available_slots!==1?'s':''} free`;
+}
+
+/* ---- board render (keyed diff) ---- */
+function ensureLanes(){
+  if($('#board').children.length)return;
+  $('#board').innerHTML=LANES.map(([key,title,col])=>`
+    <div class="lane" data-lane="${key}">
+      <div class="lane-head"><span class="ld" style="background:${col}"></span><span class="lt">${title}</span><span class="lc" data-count>0</span></div>
+      <div class="lane-body" data-body></div>
+    </div>`).join('');
+}
+function cardInner(j){
+  const age=relTime(j.updated_at);
+  let acts='';
+  if(allowAdminEdit){
+    if(j.status==='completed') acts=`<button class="act retry" data-act="retry" data-id="${j.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>Retry</button>`;
+    else if(j.status==='pending'||j.status==='dispatched') acts=`<button class="act cancel" data-act="cancel" data-id="${j.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>Cancel</button>`;
+  }
+  const runner=j.runner_name?`<span class="runner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>${j.runner_name}</span>`:'';
+  return `<div class="c-top">${badgeHTML(j)}</div>
+    <div class="c-meta"><span class="repo"><span class="own">${ownerOf(j.repo)}/</span>${nameOf(j.repo)}</span></div>
+    <div class="c-meta"><span class="wf">${j.workflow_name||''} · ${j.job_name||''}</span></div>
+    <div class="c-foot">${runner}<span class="age" title="${new Date(j.updated_at).toLocaleString()}">${age}</span></div>
+    ${acts?`<div class="acts">${acts}</div>`:''}`;
+}
+function renderBoard(list){
+  ensureLanes();
+  const byLane={pending:[],dispatched:[],in_progress:[],completed:[]};
+  list.forEach(j=>{if(byLane[j.status])byLane[j.status].push(j);});
+  LANES.forEach(([key])=>{
+    const lane=$(`.lane[data-lane="${key}"]`),body=$('[data-body]',lane);
+    $('[data-count]',lane).textContent=byLane[key].length;
+    const want=byLane[key],wantIds=new Set(want.map(j=>String(j.id)));
+    $$('[data-card]',body).forEach(node=>{
+      if(!wantIds.has(node.dataset.card)){node.classList.add('leave');setTimeout(()=>node.remove(),300);}
+    });
+    let ph=$('.lane-empty',body);
+    const live=$$('[data-card]',body).filter(n=>!n.classList.contains('leave'));
+    if(!want.length){if(!ph&&!live.length)body.insertAdjacentHTML('beforeend','<div class="lane-empty">—</div>');}
+    else if(ph)ph.remove();
+    want.forEach((j,idx)=>{
+      let node=$(`[data-card="${CSS.escape(j.id)}"]`,body);
+      if(!node){
+        node=document.createElement('div');node.className='card enter';node.dataset.card=j.id;
+        node.tabIndex=0;node.setAttribute('role','button');node.dataset.sig='';
+        node.addEventListener('click',e=>{if(e.target.closest('[data-act]'))return;openJob(j.id);});
+        node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openJob(j.id);}});
+        node.addEventListener('animationend',()=>node.classList.remove('enter'),{once:true});
+      }
+      const sig=j.status+j.conclusion+j.runner_name+j.updated_at;
+      if(node.dataset.sig!==sig){node.innerHTML=cardInner(j);node.dataset.sig=sig;}
+      const cur=body.children[idx];if(cur!==node)body.insertBefore(node,cur||null);
+    });
+  });
+}
+
+/* ---- grouped list render ---- */
+function renderGrouped(list){
+  const g=$('#grouped');
+  const groups={};
+  list.forEach(j=>{const o=ownerOf(j.repo);(groups[o]=groups[o]||[]).push(j);});
+  const order=Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length);
+  g.innerHTML=order.map(owner=>{
+    const inst=State.installs.find(i=>(i.account_login||i.login)===owner);
+    const isOrg=!inst||inst.account_type==='Organization';
+    const rows=groups[owner].map(j=>{
+      const age=relTime(j.updated_at);
+      let act='';
+      if(allowAdminEdit){
+        if(j.status==='completed') act=`<button class="act retry" data-act="retry" data-id="${j.id}">Retry</button>`;
+        else if(j.status==='pending'||j.status==='dispatched') act=`<button class="act cancel" data-act="cancel" data-id="${j.id}">Cancel</button>`;
+      }
+      return `<div class="row" data-open="${j.id}">
+        <span class="r-badge">${badgeHTML(j)}</span>
+        <span class="r-repo"><span class="own">${ownerOf(j.repo)}/</span>${nameOf(j.repo)}</span>
+        <span class="r-wf">${j.workflow_name||''} · ${j.job_name||''}</span>
+        <span class="r-runner">${j.runner_name||'—'}</span>
+        <span class="r-age">${age}</span>
+        <span class="r-act">${act}</span>
+      </div>`;
+    }).join('');
+    return `<div class="acct-group">
+      <div class="ag-head">
+        <span class="av ${isOrg?'org':''}">${owner.slice(0,2).toUpperCase()}</span>
+        <span class="nm">${owner}</span>
+        <span class="ty">${isOrg?'Org':'User'}</span>
+        <span class="ct">${groups[owner].length} job${groups[owner].length!==1?'s':''}</span>
       </div>
-      <div class="jobs-wrap">
-        <table>
-          <thead>
-            <tr>
-              {{if .AllowAdminEdit}}<th>Actions</th>{{end}}
-              <th>Status</th>
-              <th>Repo</th>
-              <th>Workflow</th>
-              <th>Runner</th>
-              <th>Updated</th>
-            </tr>
-          </thead>
-          <tbody id="jobsBody"></tbody>
-        </table>
-      </div>
-      <div id="emptyState" class="empty" hidden>No jobs match the current filters.</div>
-    </article>
-  </main>
+      <div class="list-head"><span>Status</span><span>Repo</span><span>Workflow</span><span>Runner</span><span>Updated</span><span>Actions</span></div>
+      <div class="ag-rows">${rows}</div>
+    </div>`;
+  }).join('');
+}
 
-  <script>
-    const tokenKey = "gharp.adminToken";
-    const refreshMs = 10000;
-    // Server-rendered so the JS path can mirror the server's
-    // authorization decision and avoid building disabled-looking
-    // controls that would still fire a request.
-    const allowAdminEdit = {{if .AllowAdminEdit}}true{{else}}false{{end}};
-    let refreshTimer = null;
-    let isLoading = false;
+/* ---- accounts pills ---- */
+function renderAccounts(){
+  const el=$('#accounts');
+  const counts={};
+  State.jobs.forEach(j=>{const o=ownerOf(j.repo);counts[o]=(counts[o]||0)+1;});
+  const all=`<button class="acct" data-acct="all" aria-pressed="${State.filters.account==='all'}"><span class="av">∗</span>All<span class="ct">${State.jobs.length}</span></button>`;
+  const pills=State.installs.map(a=>{
+    const login=a.account_login||a.login||'?';
+    const isOrg=a.account_type==='Organization';
+    return `<button class="acct" data-acct="${login}" aria-pressed="${State.filters.account===login}">
+      <span class="av ${isOrg?'org':''}">${login.slice(0,2).toUpperCase()}</span>${login}
+      <span class="ct">${counts[login]||0}</span></button>`;
+  }).join('');
+  el.innerHTML=all+pills;
+}
 
-    const el = {
-      adminButton: document.getElementById("adminButton"),
-      adminPanel: document.getElementById("adminPanel"),
-      authPanel: document.getElementById("authPanel"),
-      authForm: document.getElementById("authForm"),
-      tokenInput: document.getElementById("tokenInput"),
-      saveTokenButton: document.getElementById("saveTokenButton"),
-      clearTokenButton: document.getElementById("clearTokenButton"),
-      tokenButton: document.getElementById("tokenButton"),
-      refreshButton: document.getElementById("refreshButton"),
-      applyFiltersButton: document.getElementById("applyFiltersButton"),
-      clearStatusButton: document.getElementById("clearStatusButton"),
-      statusCheckboxes: document.querySelectorAll("input[name=status]"),
-      errorBanner: document.getElementById("errorBanner"),
-      lastUpdated: document.getElementById("lastUpdated"),
-      statPending: document.getElementById("statPending"),
-      statDispatched: document.getElementById("statDispatched"),
-      statInProgress: document.getElementById("statInProgress"),
-      statCompleted: document.getElementById("statCompleted"),
-      statActive: document.getElementById("statActive"),
-      statAvailable: document.getElementById("statAvailable"),
-      capacityNote: document.getElementById("capacityNote"),
-      capacityText: document.getElementById("capacityText"),
-      capacityFill: document.getElementById("capacityFill"),
-      repoInput: document.getElementById("repoInput"),
-      limitInput: document.getElementById("limitInput"),
-      jobsBody: document.getElementById("jobsBody"),
-      tableCount: document.getElementById("tableCount"),
-      emptyState: document.getElementById("emptyState")
-    };
+/* ---- master render ---- */
+function render(){
+  const list=filtered();
+  document.body.dataset.empty=list.length===0&&State.jobs.length===0?'jobs':'';
+  if(State.view==='board')renderBoard(list);else renderGrouped(list);
+  $('#tableCount').textContent=list.length+(list.length===1?' job':' jobs');
+}
 
-    function getToken() {
-      return sessionStorage.getItem(tokenKey) || "";
+/* =====================================================================
+   POLL
+   ===================================================================== */
+let timer=null,lastUpdate=0;
+async function poll(){
+  try{
+    const hdrs=State.token?{Authorization:'Bearer '+State.token}:{};
+    const [st,jb]=await Promise.all([
+      fetch('stats',{headers:hdrs}).then(r=>{if(!r.ok)throw{status:r.status};return r.json();}),
+      fetch('jobs?status=&repo=&limit=200',{headers:hdrs}).then(r=>{if(!r.ok)throw{status:r.status};return r.json();}),
+    ]);
+    State.stats=st;State.jobs=jb.jobs||[];
+    if(State.firstLoad){
+      try{
+        const ir=await fetch('installations',{headers:hdrs});
+        if(ir.ok)State.installs=await ir.json();else deriveInstalls();
+      }catch{deriveInstalls();}
+      State.firstLoad=false;
+      document.body.classList.remove('loading');
+    } else if(!State.installs.length){deriveInstalls();}
+    renderRibbon(st);renderStats(st);renderAccounts();render();
+    lastUpdate=Date.now();markLive(true);
+    $('#errorBanner').classList.remove('show');
+  }catch(err){
+    if(err&&err.status===401){markLive(false,'auth required');openDrawer('#adminDrawer');}
+    else{
+      markLive(false,'offline');
+      const eb=$('#errorBanner');eb.classList.add('show');
+      $('#errorMsg').textContent=err&&err.status?`API error ${err.status} — retrying…`:'Network error — retrying…';
     }
+  }
+}
+function deriveInstalls(){
+  const m={};
+  State.jobs.forEach(j=>{const o=ownerOf(j.repo);if(!m[o])m[o]={account_login:o,account_type:'Organization'};});
+  State.installs=Object.values(m);
+}
+function markLive(ok,msg){
+  const chip=$('#liveChip');
+  chip.classList.toggle('paused',!ok||State.paused);
+  $('#liveText').textContent=State.paused?'paused':ok?'live · just now':(msg||'reconnecting…');
+}
+let _lastSec=0;
+function tickAge(){
+  if(!lastUpdate)return;
+  const s=Math.floor((Date.now()-lastUpdate)/1000);
+  if(s===_lastSec)return;_lastSec=s;
+  if(!State.paused)$('#liveText').textContent=`live · ${s<2?'just now':s+'s ago'}`;
+}
+function startPoll(){poll();timer=setInterval(poll,POLL_MS);setInterval(tickAge,1000);}
 
-    function setToken(token) {
-      if (token) {
-        sessionStorage.setItem(tokenKey, token);
-      } else {
-        sessionStorage.removeItem(tokenKey);
-      }
-    }
+/* =====================================================================
+   JOB DRAWER
+   ===================================================================== */
+function openJob(id){
+  const j=State.jobs.find(x=>x.id===id);if(!j)return;
+  $('#jd_badge').innerHTML=badgeHTML(j);
+  $('#jd_title').textContent=j.repo;
+  $('#jd_sub').textContent=`${j.workflow_name||''} · ${j.job_name||''}`;
+  const order=['pending','dispatched','in_progress','completed'];
+  const curIdx=order.indexOf(j.status);
+  const labels=['Queued','Dispatched','Running',j.status==='completed'?(j.conclusion==='failure'?'Failed':j.conclusion==='cancelled'?'Cancelled':'Completed'):'Completed'];
+  const tl=order.map((s,i)=>{
+    let cls='pend';
+    if(i<curIdx)cls='done';
+    else if(i===curIdx)cls=j.status==='completed'?(j.conclusion==='failure'?'fail done':'done'):'cur';
+    const ts=i<=curIdx?new Date(j.updated_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
+    return `<div class="tl-step ${cls}"><span class="node"></span><div class="tt">${labels[i]}</div><div class="ts">${i<=curIdx?ts:'pending'}</div></div>`;
+  }).join('');
+  const lblchips=(j.labels||'').split(',').filter(Boolean).map(l=>`<span class="lblchip">${l}</span>`).join('');
+  $('#jd_body').innerHTML=`
+    <div class="dr-sec"><h4>Lifecycle</h4><div class="tl">${tl}</div></div>
+    <div class="dr-sec"><h4>Details</h4><dl class="kv">
+      <dt>Repository</dt><dd>${j.repo}</dd>
+      <dt>Runner</dt><dd>${j.runner_name?`<span class="mono">${j.runner_name}</span>`:'<span style="color:var(--text-faint)">not assigned</span>'}</dd>
+      <dt>Run</dt><dd><span class="mono">#${j.run_id}</span> · attempt ${j.run_attempt||1}</dd>
+      <dt>Updated</dt><dd>${new Date(j.updated_at).toLocaleString()}</dd>
+    </dl></div>
+    <div class="dr-sec"><h4>Labels</h4><div class="labels">${lblchips||'<span style="color:var(--text-faint);font-size:12px">none</span>'}</div></div>`;
+  let foot=`<a class="iconbtn" href="https://github.com/${j.repo}/actions/runs/${j.run_id}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg>Open on GitHub ↗</a>`;
+  if(allowAdminEdit){
+    if(j.status==='completed') foot+=`<button class="iconbtn btn-primary" data-act="retry" data-id="${j.id}">Retry job</button>`;
+    else if(j.status==='pending'||j.status==='dispatched') foot+=`<button class="iconbtn" style="color:var(--s-fail-fg);border-color:var(--s-fail-bd)" data-act="cancel" data-id="${j.id}">Cancel job</button>`;
+  }
+  $('#jd_foot').innerHTML=foot;
+  openDrawer('#jobDrawer');
+}
 
-    async function apiFetch(path, options = {}) {
-      const headers = new Headers(options.headers || {});
-      const token = getToken();
-      if (token) {
-        headers.set("Authorization", "Bearer " + token);
-      }
-      const res = await fetch(path, { ...options, headers });
-      if (res.status === 401) {
-        showAuth();
-        throw new Error("ADMIN_TOKEN required");
-      }
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(body.trim() || res.statusText);
-      }
-      const contentType = res.headers.get("Content-Type") || "";
-      if (contentType.includes("application/json")) {
-        return await res.json();
-      }
-      return await res.text();
-    }
+/* =====================================================================
+   MUTATIONS (retry / cancel)
+   ===================================================================== */
+async function mutate(act,id){
+  if(!allowAdminEdit){toast('Read-only mode','err');return;}
+  if(!State.token){openDrawer('#adminDrawer');$('#tokenInput').focus();toast('Admin token required','err');return;}
+  try{
+    const r=await fetch(`jobs/${id}/${act}`,{method:'POST',headers:{Authorization:'Bearer '+State.token}});
+    if(!r.ok)throw{status:r.status};
+    toast(act==='retry'?'Job re-queued':'Job cancelled','ok');
+    await poll();
+  }catch(e){toast(e.status===401?'Unauthorized — check token':'Action failed','err');}
+}
 
-    function showAuth() {
-      el.authPanel.hidden = false;
-      el.tokenInput.value = getToken();
-      el.tokenInput.focus();
-    }
+/* =====================================================================
+   DRAWERS / SCRIM
+   ===================================================================== */
+function openDrawer(sel){$(sel).classList.add('show');$(sel).setAttribute('aria-hidden','false');$('#scrim').classList.add('show');document.body.style.overflow='hidden';}
+function closeDrawers(){$$('.drawer').forEach(d=>{d.classList.remove('show');d.setAttribute('aria-hidden','true');});$('#scrim').classList.remove('show');document.body.style.overflow='';}
+$('#scrim').addEventListener('click',closeDrawers);
+$$('[data-close]').forEach(b=>b.addEventListener('click',closeDrawers));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawers();});
 
-    function showError(message) {
-      el.errorBanner.textContent = message;
-      el.errorBanner.hidden = !message;
-    }
+/* =====================================================================
+   TOASTS
+   ===================================================================== */
+function toast(msg,kind='ok'){
+  const ic=kind==='ok'?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5 9-11"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>';
+  const t=document.createElement('div');t.className='toast '+kind;t.innerHTML=ic+'<span>'+msg+'</span>';
+  $('#toasts').appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateY(8px)';setTimeout(()=>t.remove(),300);},2600);
+}
 
-    function buildJobsPath() {
-      const params = new URLSearchParams();
-      const statuses = [...document.querySelectorAll("input[name=status]:checked")].map(input => input.value);
-      for (const status of statuses) {
-        params.append("status", status);
-      }
-      const repo = el.repoInput.value.trim();
-      if (repo) {
-        params.set("repo", repo);
-      }
-      params.set("limit", el.limitInput.value || "50");
-      return "/jobs?" + params.toString();
-    }
+/* =====================================================================
+   EVENTS
+   ===================================================================== */
+document.addEventListener('click',e=>{
+  const act=e.target.closest('[data-act]');if(act){e.stopPropagation();mutate(act.dataset.act,act.dataset.id);return;}
+  const row=e.target.closest('[data-open]');if(row)openJob(row.dataset.open);
+});
+$$('.chk input[type=checkbox]').forEach(cb=>cb.addEventListener('change',()=>{
+  cb.checked?State.filters.status.add(cb.dataset.status):State.filters.status.delete(cb.dataset.status);
+  render();
+}));
+$('#repoFilter').addEventListener('input',e=>{State.filters.repo=e.target.value.trim();render();});
+$('#limitSel').addEventListener('change',e=>{State.filters.limit=+e.target.value;render();});
+$('#accounts').addEventListener('click',e=>{
+  const b=e.target.closest('[data-acct]');if(!b)return;
+  State.filters.account=b.dataset.acct;renderAccounts();render();
+});
+function clearFilters(){
+  State.filters.status.clear();State.filters.repo='';State.filters.account='all';
+  $('#repoFilter').value='';
+  $$('.chk input[type=checkbox]').forEach(c=>c.checked=false);
+  renderAccounts();render();
+}
+window.clearFilters=clearFilters;
+$('#clearBtn').addEventListener('click',clearFilters);
+$('#viewBoard').addEventListener('click',()=>setView('board'));
+$('#viewList').addEventListener('click',()=>setView('list'));
+function setView(v){State.view=v;document.body.dataset.view=v;$('#viewBoard').setAttribute('aria-pressed',v==='board');$('#viewList').setAttribute('aria-pressed',v==='list');render();}
+$('#refreshBtn').addEventListener('click',()=>{const b=$('#refreshBtn');b.style.opacity='.6';poll().then(()=>b.style.opacity='');});
+$('#adminBtn').addEventListener('click',()=>openDrawer('#adminDrawer'));
 
-    async function refresh() {
-      if (isLoading) {
-        return;
-      }
-      isLoading = true;
-      el.refreshButton.disabled = true;
-      showError("");
-      try {
-        const [stats, jobs] = await Promise.all([
-          apiFetch("/stats"),
-          apiFetch(buildJobsPath())
-        ]);
-        renderStats(stats);
-        renderJobs(jobs);
-        const now = new Date();
-        el.lastUpdated.textContent = "Updated " + now.toLocaleTimeString();
-        el.lastUpdated.title = now.toISOString();
-      } catch (err) {
-        showError(err.message || "Request failed");
-      } finally {
-        isLoading = false;
-        el.refreshButton.disabled = false;
-      }
-    }
+/* theme */
+function setTheme(t){
+  document.documentElement.dataset.theme=t;localStorage.setItem('gharp_theme',t);
+  $('#themeIcon').innerHTML=t==='dark'?'<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+}
+$('#themeBtn').addEventListener('click',()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
+(function initTheme(){const saved=localStorage.getItem('gharp_theme');const sys=matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';setTheme(saved||sys);})();
 
-    function renderStats(stats) {
-      const jobs = stats.jobs || {};
-      const capacity = stats.capacity || {};
-      el.statPending.textContent = jobs.pending || 0;
-      el.statDispatched.textContent = jobs.dispatched || 0;
-      el.statInProgress.textContent = jobs.in_progress || 0;
-      el.statCompleted.textContent = jobs.completed || 0;
-      el.statActive.textContent = capacity.active_runners || 0;
-      el.statAvailable.textContent = capacity.available_slots || 0;
+/* authForm / token — satisfies Go tests: id="authForm", authForm.addEventListener("submit" */
+$('#tokenInput').value=State.token;
+$('#tokenState').textContent=State.token?'token set':'no token';
+const authForm=document.getElementById('authForm');
+authForm.addEventListener("submit",function(e){
+  e.preventDefault();
+  const v=$('#tokenInput').value.trim();
+  State.token=v;
+  if(v)sessionStorage.setItem(tokenKey,v);else sessionStorage.removeItem(tokenKey);
+  $('#tokenState').textContent=v?'token set':'no token';
+  toast('Token saved','ok');
+});
+$('#clearTokenButton').addEventListener('click',()=>{
+  State.token='';$('#tokenInput').value='';
+  sessionStorage.removeItem(tokenKey);
+  $('#tokenState').textContent='no token';
+  toast('Token cleared','ok');
+});
 
-      const max = capacity.max_concurrent_runners || 0;
-      const active = capacity.active_runners || 0;
-      const percent = max > 0 ? Math.min(100, Math.round((active / max) * 100)) : 0;
-      el.capacityText.textContent = active + " / " + max + " active";
-      el.capacityNote.textContent = max > 0 ? "Max " + max + " runners" : "Capacity unknown";
-      el.capacityFill.value = percent;
-      if (percent >= 100) {
-        el.capacityFill.dataset.state = "full";
-      } else if (percent >= 75) {
-        el.capacityFill.dataset.state = "warn";
-      } else {
-        delete el.capacityFill.dataset.state;
-      }
-    }
+/* credential rotation — PATCH /admin/app-config */
+$$('#rotateBlocks [data-rotate]').forEach(block=>{
+  const btn=block.querySelector('button'),inp=block.querySelector('input'),fp=block.querySelector('.fp-out');
+  btn.addEventListener('click',async()=>{
+    if(!State.token){toast('Admin token required','err');$('#tokenInput').focus();return;}
+    if(!inp.value.trim()){toast('Enter a value','err');return;}
+    try{
+      const r=await fetch('admin/app-config',{method:'PATCH',
+        headers:{Authorization:'Bearer '+State.token,'Content-Type':'application/json'},
+        body:JSON.stringify({[block.dataset.rotate]:inp.value})});
+      if(!r.ok)throw{status:r.status};
+      const data=await r.json();
+      inp.value='';fp.textContent='Rotated · '+(data.fingerprint||'ok');fp.classList.add('show');
+      toast('Secret rotated','ok');
+    }catch(e){toast(e.status===401?'Unauthorized':'Rotation failed','err');}
+  });
+});
 
-    function renderJobs(data) {
-      const jobs = data.jobs || [];
-      el.jobsBody.textContent = "";
-      el.tableCount.textContent = jobs.length + (jobs.length === 1 ? " job" : " jobs");
-      el.emptyState.hidden = jobs.length !== 0;
-
-      for (const job of jobs) {
-        const row = document.createElement("tr");
-        // Actions column is hidden entirely when writes are disabled —
-        // mirrors the conditional <th>Actions</th> in the template so
-        // the column count matches.
-        const cells = allowAdminEdit
-          ? [actionsCell(job), cell(statusBadge(job)), repoCell(job), workflowCell(job), runnerCell(job), updatedCell(job.updated_at)]
-          : [cell(statusBadge(job)), repoCell(job), workflowCell(job), runnerCell(job), updatedCell(job.updated_at)];
-        row.append(...cells);
-        el.jobsBody.appendChild(row);
-      }
-    }
-
-    // Two-line cell helper: primary text on top, muted secondary
-    // text (job name, run #, time of day, etc.) directly below.
-    function stackedCell(primary, secondary, options = {}) {
-      const td = document.createElement("td");
-      td.textContent = primary || "-";
-      if (options.title) {
-        td.title = options.title;
-      }
-      if (options.className) {
-        td.className = options.className;
-      }
-      if (secondary) {
-        const sub = document.createElement("div");
-        sub.className = "muted";
-        sub.textContent = secondary;
-        td.appendChild(sub);
-      }
-      return td;
-    }
-
-    function repoCell(job) {
-      return stackedCell(job.repo || "-", job.job_name || "", {
-        title: job.repo || "",
-        className: "main-cell"
-      });
-    }
-
-    function runnerCell(job) {
-      return stackedCell(job.runner_name || "-", runLabel(job), {
-        title: job.runner_name || ""
-      });
-    }
-
-    function updatedCell(value) {
-      const td = document.createElement("td");
-      if (!value) {
-        td.textContent = "-";
-        return td;
-      }
-      const date = new Date(value);
-      td.textContent = date.toLocaleDateString();
-      td.title = date.toISOString();
-      const sub = document.createElement("div");
-      sub.className = "muted";
-      sub.textContent = date.toLocaleTimeString();
-      td.appendChild(sub);
-      return td;
-    }
-
-    function statusBadge(job) {
-      const span = document.createElement("span");
-      span.className = "badge " + (job.status || "");
-      if (job.conclusion && job.conclusion !== "success") {
-        span.classList.add("bad");
-      }
-      span.textContent = formatBadgeLabel(job.conclusion || job.status || "-");
-      return span;
-    }
-
-    function formatBadgeLabel(value) {
-      return String(value).replace(/_/g, " ");
-    }
-
-    function cell(child) {
-      const td = document.createElement("td");
-      td.appendChild(child);
-      return td;
-    }
-
-    function workflowCell(job) {
-      return stackedCell(job.workflow_name || "-", job.labels || "");
-    }
-
-    function runLabel(job) {
-      if (!job.run_id) {
-        return "";
-      }
-      const attempt = job.run_attempt ? " attempt " + job.run_attempt : "";
-      return "#" + job.run_id + attempt;
-    }
-
-    function actionsCell(job) {
-      const td = document.createElement("td");
-      const wrap = document.createElement("div");
-      wrap.className = "row-actions";
-      if (job.status === "completed") {
-        wrap.appendChild(actionButton("Retry", "retry", job.id, "secondary outline"));
-      }
-      if (job.status === "pending" || job.status === "dispatched") {
-        wrap.appendChild(actionButton("Cancel", "cancel", job.id, ""));
-      }
-      if (!wrap.children.length) {
-        wrap.classList.add("empty");
-        const span = document.createElement("span");
-        span.className = "muted";
-        span.textContent = "-";
-        wrap.appendChild(span);
-      }
-      td.appendChild(wrap);
-      return td;
-    }
-
-    function actionButton(label, action, id, variant) {
-      // Caller guarantees allowAdminEdit is true (renderJobs skips the
-      // actions cell entirely otherwise), so we don't need a disabled
-      // fallback path here. The column header is also conditionally
-      // omitted from the template, keeping the column count consistent.
-      const button = document.createElement("button");
-      button.type = "button";
-      if (variant) {
-        button.className = variant;
-      }
-      button.textContent = label;
-      button.addEventListener("click", async () => {
-        button.disabled = true;
-        showError("");
-        try {
-          await apiFetch("/jobs/" + id + "/" + action, { method: "POST" });
-          await refresh();
-        } catch (err) {
-          showError(err.message || action + " failed");
-        } finally {
-          button.disabled = false;
-        }
-      });
-      return button;
-    }
-
-    function scheduleRefresh() {
-      if (refreshTimer) {
-        clearInterval(refreshTimer);
-      }
-      refreshTimer = setInterval(refresh, refreshMs);
-    }
-
-    function syncClearStatusButton() {
-      const anyChecked = [...el.statusCheckboxes].some(box => box.checked);
-      el.clearStatusButton.disabled = !anyChecked;
-    }
-
-    function saveTokenAndRefresh() {
-      setToken(el.tokenInput.value.trim());
-      el.authPanel.hidden = true;
-      refresh();
-    }
-
-    el.tokenButton.addEventListener("click", showAuth);
-    el.refreshButton.addEventListener("click", refresh);
-    el.adminButton.addEventListener("click", () => {
-      el.adminPanel.hidden = !el.adminPanel.hidden;
-    });
-    el.applyFiltersButton.addEventListener("click", refresh);
-    el.statusCheckboxes.forEach(box => box.addEventListener("change", () => {
-      syncClearStatusButton();
-      refresh();
-    }));
-    el.clearStatusButton.addEventListener("click", () => {
-      let changed = false;
-      el.statusCheckboxes.forEach(box => {
-        if (box.checked) {
-          box.checked = false;
-          changed = true;
-        }
-      });
-      syncClearStatusButton();
-      if (changed) {
-        refresh();
-      }
-    });
-    el.authForm.addEventListener("submit", event => {
-      event.preventDefault();
-      saveTokenAndRefresh();
-    });
-    el.clearTokenButton.addEventListener("click", () => {
-      setToken("");
-      el.tokenInput.value = "";
-      refresh();
-    });
-    el.repoInput.addEventListener("keydown", event => {
-      if (event.key === "Enter") {
-        refresh();
-      }
-    });
-
-    // Rotate-credentials forms. Each form submits one field — partial
-    // PATCH means an absent field is left untouched server-side, which
-    // matches the per-field "rotate this and only this" UX.
-    function wireRotateForm(formID, inputID) {
-      const form = document.getElementById(formID);
-      if (!form) return;
-      const input = document.getElementById(inputID);
-      const status = form.querySelector("[data-status]");
-      const button = form.querySelector("button[type=submit]");
-      form.addEventListener("submit", async event => {
-        event.preventDefault();
-        if (!allowAdminEdit) return;
-        const value = input.value;
-        if (!value || !value.trim()) {
-          status.textContent = "Enter a value first";
-          status.className = "status err";
-          return;
-        }
-        button.disabled = true;
-        status.textContent = "Rotating…";
-        status.className = "status";
-        try {
-          const body = {};
-          body[form.dataset.field] = value;
-          const res = await apiFetch("/admin/app-config", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          const fp = (res && res[form.dataset.field + "_fingerprint"]) || "";
-          if (Array.isArray(res.rotated) && res.rotated.length === 0) {
-            status.textContent = "No change (value matches current)";
-            status.className = "status";
-          } else {
-            status.textContent = "Rotated · " + fp;
-            status.className = "status ok";
-            input.value = "";
-          }
-        } catch (err) {
-          status.textContent = err.message || "rotate failed";
-          status.className = "status err";
-        } finally {
-          button.disabled = !allowAdminEdit;
-        }
-      });
-    }
-
-    wireRotateForm("rotateWebhookForm", "rotateWebhookInput");
-    wireRotateForm("rotatePEMForm", "rotatePEMInput");
-    wireRotateForm("rotateClientForm", "rotateClientInput");
-
-    syncClearStatusButton();
-    refresh();
-    scheduleRefresh();
-  </script>
+/* boot */
+applyReadonly();
+document.body.dataset.view='board';
+$('#pollSecs').textContent=POLL_MS/1000;
+startPoll();
+})();
+</script>
 </body>
 </html>

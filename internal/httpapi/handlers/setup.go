@@ -62,7 +62,11 @@ func (h *SetupHandler) Get(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     stateCookie,
 		Value:    state,
-		Path:     "/github/app/callback",
+		// Path "/" (not "/github/app/callback") so the cookie survives when gharp
+		// is served under a path prefix by a reverse proxy (e.g. /gh/<slot>): the
+		// real callback URL is then /gh/<slot>/github/app/callback, which would not
+		// match a "/github/app/callback" cookie path. Single-use, 10-min TTL.
+		Path:     "/",
 		HttpOnly: true,
 		Secure:   strings.HasPrefix(h.Cfg.BaseURL, "https://"),
 		SameSite: http.SameSiteLaxMode,
