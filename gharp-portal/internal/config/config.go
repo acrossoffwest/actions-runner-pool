@@ -24,7 +24,7 @@ type C struct {
 	OAuthClientSecret string // never log or render
 
 	// Bootstrap
-	BootstrapAdminLogin string // GitHub login promoted to admin on first login
+	BootstrapAdminLogin string // comma-separated GitHub logins promoted to admin on first login
 
 	// Session
 	SessionTTL time.Duration // default 7 days

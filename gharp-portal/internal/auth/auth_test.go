@@ -312,6 +312,29 @@ func TestCallback_NotInvited(t *testing.T) {
 
 // ── /auth/callback — bootstrap admin ─────────────────────────────────────────
 
+func TestIsBootstrapAdmin(t *testing.T) {
+	cases := []struct {
+		cfg, login string
+		want       bool
+	}{
+		{"superuser", "superuser", true},      // single, exact
+		{"Admin", "admin", true},              // case-insensitive
+		{"alice,bob,carol", "bob", true},      // middle of a list
+		{"alice, bob , carol", "carol", true}, // surrounding spaces trimmed
+		{"alice,bob", "dave", false},          // not listed
+		{"alice,", "", false},                 // empty entry must not match empty login
+		{"", "alice", false},                  // unset → nobody is bootstrap admin
+		{"  ", "alice", false},                // whitespace-only → nobody
+		{"alice,,bob", "bob", true},           // double comma tolerated
+	}
+	for _, c := range cases {
+		cfg := Config{BootstrapAdminLogin: c.cfg}
+		if got := cfg.isBootstrapAdmin(c.login); got != c.want {
+			t.Errorf("isBootstrapAdmin(cfg=%q, login=%q) = %v, want %v", c.cfg, c.login, got, c.want)
+		}
+	}
+}
+
 func TestCallback_BootstrapAdmin(t *testing.T) {
 	states := NewOAuthStates()
 	states.Put("st")

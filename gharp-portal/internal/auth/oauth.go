@@ -68,8 +68,7 @@ func CallbackHandler(cfg Config, gh GitHubClient, st Store, states *OAuthStates)
 		if err != nil {
 			if errors.Is(err, ErrNotInvited) {
 				// Bootstrap admin bypass: create an admin invite on the fly.
-				if cfg.BootstrapAdminLogin != "" &&
-					strings.EqualFold(ghUser.Login, cfg.BootstrapAdminLogin) {
+				if cfg.isBootstrapAdmin(ghUser.Login) {
 					if _, ie := st.InviteUser(ghUser.Login, "admin"); ie != nil {
 						http.Error(w, "internal error", http.StatusInternalServerError)
 						return
@@ -150,4 +149,20 @@ func LogoutHandler(st Store) http.Handler {
 
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	})
+}
+
+// isBootstrapAdmin reports whether login matches any of the comma-separated
+// GitHub logins in BootstrapAdminLogin (case-insensitive). Empty or
+// whitespace-only entries never match, so a trailing comma, a double comma,
+// or an unset value grants no one admin.
+func (c Config) isBootstrapAdmin(login string) bool {
+	if login == "" {
+		return false
+	}
+	for _, entry := range strings.Split(c.BootstrapAdminLogin, ",") {
+		if entry = strings.TrimSpace(entry); entry != "" && strings.EqualFold(entry, login) {
+			return true
+		}
+	}
+	return false
 }

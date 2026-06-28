@@ -20,8 +20,9 @@ type Config struct {
 	OAuthClientSecret string
 	// BaseURL is the portal's public base URL, e.g. "https://portal.example.com".
 	BaseURL string
-	// BootstrapAdminLogin is the GitHub login that gets admin on first login,
-	// bypassing the invite gate.  Corresponds to env BOOTSTRAP_ADMIN_LOGIN.
+	// BootstrapAdminLogin is a comma-separated list of GitHub logins that get
+	// admin on first login, bypassing the invite gate. Corresponds to env
+	// BOOTSTRAP_ADMIN_LOGIN (e.g. "alice,bob"). Matching is case-insensitive.
 	BootstrapAdminLogin string
 	// SessionTTL defaults to 7 days.  Corresponds to env SESSION_TTL.
 	SessionTTL time.Duration
