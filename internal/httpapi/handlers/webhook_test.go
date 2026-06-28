@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -643,6 +646,152 @@ func TestWebhook_EmptySecret_RejectsSignature(t *testing.T) {
 	rr := postWebhook(t, h, "ping", body, sign("", body))
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401 (empty-secret rejection)", rr.Code)
+	}
+}
+
+// spySender records the last SendMessage call for assertions.
+type spySender struct {
+	calls int
+	token string
+	chat  string
+	text  string
+	err   error
+}
+
+func (s *spySender) SendMessage(_ context.Context, token, chatID, text string) error {
+	s.calls++
+	s.token, s.chat, s.text = token, chatID, text
+	return s.err
+}
+
+func newWorkflowRunBody(t *testing.T, action, conclusion string) []byte {
+	t.Helper()
+	b, err := json.Marshal(map[string]any{
+		"action": action,
+		"workflow_run": map[string]any{
+			"name": "CI", "conclusion": conclusion, "html_url": "https://x/runs/1",
+			"head_branch": "main", "run_number": 7,
+		},
+		"repository": map[string]any{"full_name": "o/r"},
+		"sender":     map[string]any{"login": "alice"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+func newWebhookHandlerWithNotify(t *testing.T, s *spySender, settings *store.NotifySettings) *WebhookHandler {
+	t.Helper()
+	st, err := store.OpenSQLite("file:" + t.TempDir() + "/t.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	if settings != nil {
+		if err := st.SaveNotifySettings(context.Background(), settings); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return &WebhookHandler{Store: st, Telegram: s, Log: slog.Default()}
+}
+
+func TestHandleWorkflowRun_Completed_Sends(t *testing.T) {
+	s := &spySender{}
+	h := newWebhookHandlerWithNotify(t, s, &store.NotifySettings{
+		Enabled: true, BotToken: "tok", ChatID: "99", Mode: "all",
+	})
+	rec := httptest.NewRecorder()
+	body := newWorkflowRunBody(t, "completed", "success")
+	h.handleWorkflowRun(rec, httptest.NewRequest(http.MethodPost, "/github/webhook", bytes.NewReader(body)), body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if s.calls != 1 || s.token != "tok" || s.chat != "99" {
+		t.Fatalf("send = %+v", s)
+	}
+	if !strings.Contains(s.text, "o/r") || !strings.Contains(s.text, "run #7") {
+		t.Fatalf("text = %q", s.text)
+	}
+}
+
+func TestHandleWorkflowRun_NonCompleted_Ignored(t *testing.T) {
+	s := &spySender{}
+	h := newWebhookHandlerWithNotify(t, s, &store.NotifySettings{Enabled: true, BotToken: "t", ChatID: "1", Mode: "all"})
+	rec := httptest.NewRecorder()
+	body := newWorkflowRunBody(t, "requested", "")
+	h.handleWorkflowRun(rec, httptest.NewRequest(http.MethodPost, "/github/webhook", bytes.NewReader(body)), body)
+	if rec.Code != http.StatusOK || s.calls != 0 {
+		t.Fatalf("status=%d calls=%d", rec.Code, s.calls)
+	}
+}
+
+func TestHandleWorkflowRun_Disabled_NoSend(t *testing.T) {
+	s := &spySender{}
+	h := newWebhookHandlerWithNotify(t, s, &store.NotifySettings{Enabled: false, BotToken: "t", ChatID: "1", Mode: "all"})
+	rec := httptest.NewRecorder()
+	body := newWorkflowRunBody(t, "completed", "failure")
+	h.handleWorkflowRun(rec, httptest.NewRequest(http.MethodPost, "/github/webhook", bytes.NewReader(body)), body)
+	if rec.Code != http.StatusOK || s.calls != 0 {
+		t.Fatalf("status=%d calls=%d", rec.Code, s.calls)
+	}
+}
+
+func TestHandleWorkflowRun_FailuresMode_SkipsSuccess(t *testing.T) {
+	s := &spySender{}
+	h := newWebhookHandlerWithNotify(t, s, &store.NotifySettings{Enabled: true, BotToken: "t", ChatID: "1", Mode: "failures"})
+	rec := httptest.NewRecorder()
+	body := newWorkflowRunBody(t, "completed", "success")
+	h.handleWorkflowRun(rec, httptest.NewRequest(http.MethodPost, "/github/webhook", bytes.NewReader(body)), body)
+	if s.calls != 0 {
+		t.Fatalf("expected skip, calls=%d", s.calls)
+	}
+	// Failure in the same mode DOES send.
+	body = newWorkflowRunBody(t, "completed", "failure")
+	h.handleWorkflowRun(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/github/webhook", bytes.NewReader(body)), body)
+	if s.calls != 1 {
+		t.Fatalf("expected one send for failure, calls=%d", s.calls)
+	}
+}
+
+func TestHandleWorkflowRun_SendError_Still200(t *testing.T) {
+	s := &spySender{err: errors.New("boom")}
+	h := newWebhookHandlerWithNotify(t, s, &store.NotifySettings{Enabled: true, BotToken: "t", ChatID: "1", Mode: "all"})
+	rec := httptest.NewRecorder()
+	body := newWorkflowRunBody(t, "completed", "failure")
+	h.handleWorkflowRun(rec, httptest.NewRequest(http.MethodPost, "/github/webhook", bytes.NewReader(body)), body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d (telegram failure must not fail the webhook)", rec.Code)
+	}
+}
+
+func TestBuildRunMessage_FormatByConclusion(t *testing.T) {
+	mk := func(concl string) *workflowRunEvent {
+		ev := &workflowRunEvent{}
+		ev.Action = "completed"
+		ev.WorkflowRun.Name = "CI"
+		ev.WorkflowRun.Conclusion = concl
+		ev.WorkflowRun.HTMLURL = "https://x/runs/1"
+		ev.WorkflowRun.HeadBranch = "main"
+		ev.WorkflowRun.RunNumber = 7
+		ev.Repository.FullName = "o/r"
+		ev.Sender.Login = "alice"
+		return ev
+	}
+	cases := []struct{ concl, icon, verb string }{
+		{"success", "✅", "passed"},
+		{"failure", "❌", "failed"},
+		{"cancelled", "⚠️", "cancelled"},
+		{"timed_out", "ℹ️", "timed_out"},
+	}
+	for _, c := range cases {
+		got := buildRunMessage(mk(c.concl))
+		if !strings.HasPrefix(got, c.icon+" CI "+c.verb+" — o/r") {
+			t.Fatalf("conclusion %q: got %q", c.concl, got)
+		}
+		if !strings.Contains(got, "run #7 · branch main · @alice") || !strings.Contains(got, "https://x/runs/1") {
+			t.Fatalf("conclusion %q body: %q", c.concl, got)
+		}
 	}
 }
 

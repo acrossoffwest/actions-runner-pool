@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -23,11 +25,18 @@ type jobEnqueuer interface {
 	Enqueue(jobID int64)
 }
 
+// messageSender is the subset of *notify.Client the webhook needs to
+// deliver a notification; an interface so tests can pass a spy.
+type messageSender interface {
+	SendMessage(ctx context.Context, token, chatID, text string) error
+}
+
 // WebhookHandler handles GitHub webhook events.
 type WebhookHandler struct {
 	Cfg       *config.Config
 	Store     store.Store
 	Scheduler jobEnqueuer
+	Telegram  messageSender // nil disables notifications (e.g. in unrelated tests)
 	Log       *slog.Logger
 }
 
@@ -77,6 +86,8 @@ func (h *WebhookHandler) Post(w http.ResponseWriter, r *http.Request) {
 		h.handleInstallationRepositories(w, r, body)
 	case "workflow_job":
 		h.handleWorkflowJob(w, r, body)
+	case "workflow_run":
+		h.handleWorkflowRun(w, r, body)
 	default:
 		// Quietly accept events we did not subscribe to (defensive).
 		w.WriteHeader(http.StatusOK)
@@ -430,4 +441,80 @@ func (h *WebhookHandler) logError(msg string, err error) {
 	if h.Log != nil {
 		h.Log.Error(msg, "error", err)
 	}
+}
+
+// ---------------- workflow_run (Telegram notifications) ----------------
+
+type workflowRunEvent struct {
+	Action      string `json:"action"`
+	WorkflowRun struct {
+		Name       string `json:"name"`
+		Conclusion string `json:"conclusion"`
+		HTMLURL    string `json:"html_url"`
+		HeadBranch string `json:"head_branch"`
+		RunNumber  int64  `json:"run_number"`
+	} `json:"workflow_run"`
+	Repository struct {
+		FullName string `json:"full_name"`
+	} `json:"repository"`
+	Sender struct {
+		Login string `json:"login"`
+	} `json:"sender"`
+}
+
+// handleWorkflowRun delivers a Telegram message for a completed workflow
+// run when notifications are enabled. Notification delivery is
+// best-effort: any failure (bad payload, store error, Telegram error) is
+// logged and still returns 200, so GitHub does not retry a transient
+// notification problem as a webhook failure.
+func (h *WebhookHandler) handleWorkflowRun(w http.ResponseWriter, r *http.Request, body []byte) {
+	var ev workflowRunEvent
+	if err := json.Unmarshal(body, &ev); err != nil {
+		h.logError("unmarshal workflow_run", err)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if ev.Action != "completed" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	settings, err := h.Store.GetNotifySettings(r.Context())
+	if err != nil {
+		h.logError("load notify settings", err)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if !settings.Enabled || settings.BotToken == "" || settings.ChatID == "" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if settings.Mode == "failures" && ev.WorkflowRun.Conclusion == "success" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if h.Telegram != nil {
+		if err := h.Telegram.SendMessage(r.Context(), settings.BotToken, settings.ChatID, buildRunMessage(&ev)); err != nil {
+			h.logError("send telegram notification", err)
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// buildRunMessage renders the plain-text notification for a completed run.
+func buildRunMessage(ev *workflowRunEvent) string {
+	run := ev.WorkflowRun
+	var icon, verb string
+	switch run.Conclusion {
+	case "success":
+		icon, verb = "✅", "passed"
+	case "failure":
+		icon, verb = "❌", "failed"
+	case "cancelled":
+		icon, verb = "⚠️", "cancelled"
+	default:
+		icon, verb = "ℹ️", run.Conclusion
+	}
+	return fmt.Sprintf("%s %s %s — %s\nrun #%d · branch %s · @%s\n%s",
+		icon, run.Name, verb, ev.Repository.FullName,
+		run.RunNumber, run.HeadBranch, ev.Sender.Login, run.HTMLURL)
 }

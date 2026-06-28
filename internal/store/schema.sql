@@ -16,6 +16,15 @@ CREATE TABLE IF NOT EXISTS app_config (
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS notify_settings (
+  id           INTEGER PRIMARY KEY CHECK (id = 1),
+  enabled      INTEGER NOT NULL DEFAULT 0,
+  tg_bot_token TEXT    NOT NULL DEFAULT '',
+  tg_chat_id   TEXT    NOT NULL DEFAULT '',
+  chat_title   TEXT    NOT NULL DEFAULT '',
+  mode         TEXT    NOT NULL DEFAULT 'all'
+);
+
 CREATE TABLE IF NOT EXISTS installations (
   id             INTEGER PRIMARY KEY,
   account_id     INTEGER NOT NULL,

@@ -321,6 +321,11 @@ body.loading .board{display:grid}
   .drawer{width:100vw}
 }
 @media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+/* ---------- notifications panel (admin drawer) ---------- */
+.muted{color:var(--text-dim);font-size:12px}
+.ntRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.ntInline{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;margin-top:8px;user-select:none}
 </style>
 </head>
 <body class="loading">
@@ -530,6 +535,43 @@ body.loading .board{display:grid}
           <span id="tokenState" style="font-size:12px;color:var(--text-faint);align-self:center"></span>
         </div>
       </form>
+    </div>
+
+    <p class="adm-section-head">Notifications</p>
+    <div class="adm-block" id="notifyCard">
+      <h5>Telegram alerts</h5>
+      <p>Send a Telegram message when a workflow run finishes.</p>
+
+      <div class="inrow">
+        <label for="ntToken">Bot token</label>
+        <input class="txt" id="ntToken" type="password" placeholder="123456:ABC-..." autocomplete="off">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+        <button class="iconbtn" id="ntSaveToken" type="button"{{if not .AllowAdminEdit}} disabled{{end}} style="height:36px">Save token</button>
+        <span id="ntTokenState" class="muted"></span>
+      </div>
+
+      <div class="ntRow">
+        <button class="iconbtn" id="ntConnect" type="button"{{if not .AllowAdminEdit}} disabled{{end}} style="height:36px">Connect chat</button>
+        <span id="ntChatState" class="muted">Send <code>/start</code> to your bot, then click Connect.</span>
+      </div>
+
+      <div class="inrow" style="margin-top:10px">
+        <label for="ntMode">Notify on</label>
+        <select class="sel" id="ntMode">
+          <option value="all">All runs</option>
+          <option value="failures">Failures only</option>
+        </select>
+      </div>
+
+      <label class="ntInline">
+        <input id="ntEnabled" type="checkbox"> Enabled
+      </label>
+
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+        <button class="iconbtn" id="ntTest" type="button"{{if not .AllowAdminEdit}} disabled{{end}} style="height:36px">Send test</button>
+        <span id="ntTestState" class="muted"></span>
+      </div>
     </div>
 
     <!-- Rotate credentials -->
@@ -1001,6 +1043,59 @@ $$('#rotateBlocks [data-rotate]').forEach(block=>{
     }catch(e){toast(e.status===401?'Unauthorized':'Rotation failed','err');}
   });
 });
+
+/* =====================================================================
+   NOTIFICATIONS PANEL
+   ===================================================================== */
+function ntHeaders(json){
+  const h = State.token ? {Authorization:'Bearer '+State.token} : {};
+  if(json) h['Content-Type']='application/json';
+  return h;
+}
+function ntSet(id,msg){ const el=document.getElementById(id); if(el) el.textContent=msg; }
+
+async function ntLoad(){
+  try{
+    const r = await fetch('notifications',{headers:ntHeaders(false)});
+    if(!r.ok) return;
+    const v = await r.json();
+    document.getElementById('ntMode').value = v.mode || 'all';
+    document.getElementById('ntEnabled').checked = !!v.enabled;
+    ntSet('ntTokenState', v.has_token ? ('token set '+(v.token_hint||'')) : 'no token');
+    ntSet('ntChatState', v.chat_id ? ('connected: '+(v.chat_title||v.chat_id)) : 'not connected');
+  }catch(e){/* panel stays at defaults */}
+}
+
+async function ntPost(path, body){
+  const r = await fetch(path, {method:'POST', headers:ntHeaders(!!body), body: body?JSON.stringify(body):undefined});
+  if(!r.ok){ throw new Error((await r.text()) || ('HTTP '+r.status)); }
+  return r.status===204 ? null : r.json();
+}
+
+document.getElementById('ntSaveToken').addEventListener('click', async ()=>{
+  const tok = document.getElementById('ntToken').value.trim();
+  try{ const v=await ntPost('notifications/token',{token:tok});
+       document.getElementById('ntToken').value='';
+       ntSet('ntTokenState','token set '+(v.token_hint||'')); }
+  catch(e){ ntSet('ntTokenState','error: '+e.message); }
+});
+document.getElementById('ntConnect').addEventListener('click', async ()=>{
+  try{ const v=await ntPost('notifications/connect',null);
+       ntSet('ntChatState','connected: '+(v.chat_title||v.chat_id)); }
+  catch(e){ ntSet('ntChatState','error: '+e.message); }
+});
+document.getElementById('ntMode').addEventListener('change', async (ev)=>{
+  try{ await ntPost('notifications/mode',{mode:ev.target.value}); }catch(e){ ntSet('ntChatState','error: '+e.message); }
+});
+document.getElementById('ntEnabled').addEventListener('change', async (ev)=>{
+  try{ await ntPost('notifications/enabled',{enabled:ev.target.checked}); }catch(e){ ntSet('ntChatState','error: '+e.message); }
+});
+document.getElementById('ntTest').addEventListener('click', async ()=>{
+  try{ await ntPost('notifications/test',null); ntSet('ntTestState','sent ✓'); }
+  catch(e){ ntSet('ntTestState','error: '+e.message); }
+});
+
+ntLoad();
 
 /* boot */
 applyReadonly();

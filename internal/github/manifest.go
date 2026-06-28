@@ -55,7 +55,7 @@ func BuildManifest(baseURL string) Manifest {
 		// automatically once the App is installed. Including them makes
 		// the manifest fail validation ("Default events unsupported").
 		// They still arrive at our webhook and we still handle them.
-		DefaultEvents: []string{"workflow_job"},
+		DefaultEvents: []string{"workflow_job", "workflow_run"},
 	}
 }
 

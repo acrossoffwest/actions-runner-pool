@@ -8,6 +8,7 @@ import (
 	"github.com/muhac/actions-runner-pool/internal/config"
 	"github.com/muhac/actions-runner-pool/internal/github"
 	"github.com/muhac/actions-runner-pool/internal/httpapi/handlers"
+	"github.com/muhac/actions-runner-pool/internal/notify"
 	"github.com/muhac/actions-runner-pool/internal/scheduler"
 	"github.com/muhac/actions-runner-pool/internal/store"
 )
@@ -44,8 +45,18 @@ func NewRouter(cfg *config.Config, st store.Store, gh *github.Client, sch *sched
 	appCfgHandler := &handlers.AppConfigHandler{Cfg: cfg, Store: st, Log: log}
 	mux.HandleFunc("PATCH /admin/app-config", appCfgHandler.Patch)
 
-	wh := &handlers.WebhookHandler{Cfg: cfg, Store: st, Scheduler: sch, Log: log}
+	tg := notify.New()
+
+	wh := &handlers.WebhookHandler{Cfg: cfg, Store: st, Scheduler: sch, Telegram: tg, Log: log}
 	mux.HandleFunc("POST /github/webhook", wh.Post)
+
+	notif := &handlers.NotificationsHandler{Cfg: cfg, Store: st, Telegram: tg, Log: log}
+	mux.HandleFunc("GET /notifications", notif.GetSettings)
+	mux.HandleFunc("POST /notifications/token", notif.SaveToken)
+	mux.HandleFunc("POST /notifications/connect", notif.Connect)
+	mux.HandleFunc("POST /notifications/mode", notif.SetMode)
+	mux.HandleFunc("POST /notifications/enabled", notif.SetEnabled)
+	mux.HandleFunc("POST /notifications/test", notif.Test)
 
 	return mux
 }
